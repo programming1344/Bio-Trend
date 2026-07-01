@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bio Trend Dashboard</title>
+    <link rel="stylesheet" href="/dashboard/styles.css" />
+  </head>
+  <body data-auth="locked">
+    <section class="auth-shell" id="authShell">
+      <div class="auth-card">
+        <div class="auth-copy">
+          <span class="brand-kicker">Protected access</span>
+          <h1>Bio Trend Admin</h1>
+          <p>Sign in before opening the dashboard. Staff accounts can edit the site. Only admin accounts can create and manage staff credentials.</p>
+        </div>
+
+        <form class="auth-form" id="loginForm">
+          <label class="field">
+            <span>Username</span>
+            <input id="loginUsername" type="text" autocomplete="username" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="loginPassword" type="password" autocomplete="current-password" required />
+          </label>
+          <p class="auth-error" id="loginError"></p>
+          <button class="primary-btn auth-submit" id="loginSubmitBtn" type="submit">Login</button>
+        </form>
+      </div>
+    </section>
+
+    <div class="dashboard-shell" id="dashboardShell">
+      <aside class="dashboard-sidebar">
+        <div class="sidebar-brand">
+          <span class="brand-kicker">Visual control</span>
+          <h1>Bio Trend Dashboard</h1>
+          <p>Manage content, media, theme, analytics, and submissions without touching code.</p>
+        </div>
+
+        <div class="sidebar-user">
+          <div class="user-chip">
+            <strong id="currentUserName">Signed out</strong>
+            <span id="currentUserMeta">No active session</span>
+          </div>
+          <button class="ghost-btn small" id="logoutBtn" type="button">Logout</button>
+        </div>
+
+        <nav class="sidebar-nav" id="sidebarNav"></nav>
+
+        <div class="sidebar-footer">
+          <div class="status-row">
+            <span class="status-dot" id="healthDot"></span>
+            <span id="healthText">Checking backend...</span>
+          </div>
+          <button class="ghost-btn" id="refreshAllBtn" type="button">Refresh All</button>
+        </div>
+      </aside>
+
+      <main class="dashboard-main">
+        <header class="dashboard-topbar">
+          <div>
+            <p class="topbar-kicker">Live editor</p>
+            <h2 id="panelTitle">Overview</h2>
+          </div>
+          <div class="topbar-actions">
+            <div class="session-badge" id="sessionBadge">Protected session</div>
+            <button class="ghost-btn" id="downloadContentBtn" type="button">Download Content</button>
+            <button class="ghost-btn" id="downloadSettingsBtn" type="button">Download Theme</button>
+          </div>
+        </header>
+
+        <section class="panel active" data-panel="overview">
+          <div class="metrics-grid" id="metricsGrid"></div>
+          <div class="two-col-grid">
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Recent Activity</h3>
+                  <p class="card-note">Latest dashboard saves and form activity.</p>
+                </div>
+                <button class="ghost-btn small" id="refreshAnalyticsBtn" type="button">Refresh</button>
+              </div>
+              <div class="activity-list" id="activityList"></div>
+            </article>
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Content Footprint</h3>
+                  <p class="card-note">Quick counts across navigation, hero content, and project cards.</p>
+                </div>
+              </div>
+              <div class="summary-grid" id="summaryGrid"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="content">
+          <div class="three-col-grid">
+            <article class="card preview-card preview-span">
+              <div class="card-head">
+                <div>
+                  <h3>Live Site Preview</h3>
+                  <p class="card-note">Pick a page, save changes, then refresh the preview.</p>
+                </div>
+                <div class="inline-actions">
+                  <select id="previewPageSelect" aria-label="Preview page"></select>
+                  <button class="ghost-btn small" id="refreshPreviewBtn" type="button">Refresh Preview</button>
+                  <a class="ghost-btn small" id="openPreviewBtn" target="_blank" rel="noopener noreferrer">Open Page</a>
+                </div>
+              </div>
+              <iframe class="site-preview-frame" id="sitePreviewFrame" title="Website preview"></iframe>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Media Library</h3>
+                  <p class="card-note">Logo, videos, and page imagery with visual thumbnails.</p>
+                </div>
+              </div>
+              <div class="media-library compact" id="mediaLibrary"></div>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h3>Visual Content Editor</h3>
+                <p class="card-note">Edit every page section, cards, links, buttons, and messages visually.</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost-btn small" id="resetContentBtn" type="button">Reset to Default</button>
+                <button class="primary-btn" id="saveContentBtn" type="button">Save Content</button>
+              </div>
+            </div>
+            <div class="editor-sections" id="contentSections"></div>
+          </article>
+
+          <article class="card">
+            <details class="advanced-block">
+              <summary>Advanced Content JSON</summary>
+              <div class="advanced-body">
+                <div class="inline-actions">
+                  <button class="ghost-btn small" id="applyContentJsonBtn" type="button">Apply JSON</button>
+                </div>
+                <textarea class="code-editor" id="contentEditor" spellcheck="false"></textarea>
+              </div>
+            </details>
+          </article>
+        </section>
+
+        <section class="panel" data-panel="theme">
+          <div class="three-col-grid">
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Typography</h3>
+                  <p class="card-note">Font family and readable size controls for every major text type.</p>
+                </div>
+              </div>
+              <div class="field-stack">
+                <label class="field">
+                  <span>Font Family</span>
+                  <select id="fontFamily" aria-label="Font family"></select>
+                </label>
+              </div>
+              <div class="slider-stack" id="typographyControls"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Light Theme</h3>
+                  <p class="card-note">Colors used when the public site is in light mode.</p>
+                </div>
+              </div>
+              <div class="color-grid" id="lightPaletteEditor"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Dark Theme</h3>
+                  <p class="card-note">Colors used when the public site is in dark mode.</p>
+                </div>
+              </div>
+              <div class="color-grid" id="darkPaletteEditor"></div>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h3>Theme Preview</h3>
+                <p class="card-note">Live mockups using the current font and color controls.</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost-btn small" id="resetSettingsBtn" type="button">Reset to Default</button>
+                <button class="primary-btn" id="saveSettingsBtn" type="button">Save Theme</button>
+              </div>
+            </div>
+            <div class="theme-preview-grid" id="themePreviewGrid"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h3>Site Settings</h3>
+                <p class="card-note">Basic endpoint and dashboard refresh settings.</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost-btn small" id="applySettingsFieldsBtn" type="button">Apply Settings</button>
+              </div>
+            </div>
+            <div class="two-col-grid compact-grid">
+              <label class="field">
+                <span>API Base URL</span>
+                <input id="apiBaseUrl" type="text" />
+              </label>
+              <label class="field">
+                <span>Analytics Refresh (seconds)</span>
+                <input id="dashboardRefreshSeconds" type="number" min="5" step="5" />
+              </label>
+            </div>
+            <label class="field">
+              <span>Traffic Sources</span>
+              <textarea id="trafficSourcesEditor" rows="4"></textarea>
+              <small>One source per line.</small>
+            </label>
+          </article>
+
+          <article class="card">
+            <details class="advanced-block">
+              <summary>Advanced Theme JSON</summary>
+              <div class="advanced-body">
+                <div class="inline-actions">
+                  <button class="ghost-btn small" id="applySettingsJsonBtn" type="button">Apply JSON</button>
+                </div>
+                <textarea class="code-editor" id="settingsEditor" spellcheck="false"></textarea>
+              </div>
+            </details>
+          </article>
+        </section>
+
+        <section class="panel" data-panel="assets">
+          <div class="two-col-grid">
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Media Gallery</h3>
+                  <p class="card-note">Swap images and videos anywhere on the website.</p>
+                </div>
+              </div>
+              <div class="media-library" id="assetMediaLibrary"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Forms & Messages</h3>
+                  <p class="card-note">Edit placeholders, button labels, and success messages visually.</p>
+                </div>
+              </div>
+              <div class="editor-sections compact" id="formsSections"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="analytics">
+          <div class="two-col-grid">
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Submission Volume</h3>
+                  <p class="card-note">Lead counts by form type.</p>
+                </div>
+              </div>
+              <div class="analytics-chart" id="submissionChart"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Traffic Priorities</h3>
+                  <p class="card-note">Configured reporting sources for this dashboard.</p>
+                </div>
+              </div>
+              <div class="source-list" id="sourceList"></div>
+            </article>
+          </div>
+
+          <div class="two-col-grid admin-only hidden" id="adminAnalyticsRow">
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Staff Usage Analytics</h3>
+                  <p class="card-note">Per-user dashboard activity and change counts.</p>
+                </div>
+              </div>
+              <div class="team-usage-grid" id="teamUsageGrid"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Change History</h3>
+                  <p class="card-note">Recent staff and admin actions with timestamps.</p>
+                </div>
+              </div>
+              <div class="history-list" id="changeHistoryList"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel admin-only hidden" data-panel="team" id="teamPanel">
+          <div class="two-col-grid">
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Add Staff Member</h3>
+                  <p class="card-note">Only admin users can create staff accounts and define their login credentials.</p>
+                </div>
+              </div>
+              <form class="field-stack" id="createStaffForm">
+                <label class="field">
+                  <span>Staff Name</span>
+                  <input id="staffDisplayName" type="text" required />
+                </label>
+                <label class="field">
+                  <span>Username</span>
+                  <input id="staffUsername" type="text" required />
+                </label>
+                <label class="field">
+                  <span>Password</span>
+                  <input id="staffPassword" type="password" minlength="8" required />
+                </label>
+                <p class="auth-error" id="staffFormError"></p>
+                <button class="primary-btn" id="createStaffBtn" type="submit">Create Staff Account</button>
+              </form>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Admin Controls</h3>
+                  <p class="card-note">Track changes, reset credentials, and control account access.</p>
+                </div>
+              </div>
+              <div class="history-list" id="teamHistoryList"></div>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h3>User Accounts</h3>
+                <p class="card-note">Edit display names, usernames, account status, and passwords.</p>
+              </div>
+            </div>
+            <div class="user-grid" id="userGrid"></div>
+          </article>
+        </section>
+
+        <section class="panel" data-panel="submissions">
+          <div class="two-col-grid">
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Contact Leads</h3>
+                  <p class="card-note">Latest contact form submissions.</p>
+                </div>
+              </div>
+              <div class="table-wrap"><table class="data-table" id="contactTable"></table></div>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <div>
+                  <h3>Project Leads</h3>
+                  <p class="card-note">Latest start-project enquiries.</p>
+                </div>
+              </div>
+              <div class="table-wrap"><table class="data-table" id="projectTable"></table></div>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h3>Newsletter Signups</h3>
+                <p class="card-note">Latest newsletter submissions.</p>
+              </div>
+            </div>
+            <div class="table-wrap"><table class="data-table" id="newsletterTable"></table></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="/dashboard/app.js"></script>
+  </body>
+</html>
