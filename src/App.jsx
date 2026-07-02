@@ -41,6 +41,7 @@ const createProjectFormState = () => ({
 const calculateOffsets = (tons) => ({
   co2Saved: (tons * 1.83).toFixed(1),
   treesEquivalent: Math.round(tons * 30.5),
+  truckloads: Math.round(tons * 1.35 * 12 / 15),
 });
 
 const getHeroUiPhase = (time) => {
@@ -540,7 +541,7 @@ function ProcessPage() {
 function ImpactPage() {
   const { intro, overview, calculator } = siteContent.pages.impact;
   const [coalOffset, setCoalOffset] = useState(calculator.range.defaultValue);
-  const { co2Saved, treesEquivalent } = calculateOffsets(coalOffset);
+  const { co2Saved, treesEquivalent, truckloads } = calculateOffsets(coalOffset);
 
   return (
     <>
@@ -591,6 +592,10 @@ function ImpactPage() {
             <div className="result-item">
               <span className="result-num">{treesEquivalent.toLocaleString()}</span>
               <span className="result-lbl">{calculator.results.treesLabel}</span>
+            </div>
+            <div className="result-item">
+              <span className="result-num">{truckloads.toLocaleString()} Trucks</span>
+              <span className="result-lbl">Agri-Waste Diverted / year</span>
             </div>
           </div>
         </div>

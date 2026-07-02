@@ -65,8 +65,7 @@
           </div>
           <div class="topbar-actions">
             <div class="session-badge" id="sessionBadge">Protected session</div>
-            <button class="ghost-btn" id="downloadContentBtn" type="button">Download Content</button>
-            <button class="ghost-btn" id="downloadSettingsBtn" type="button">Download Theme</button>
+            <div class="session-badge subtle" id="autoRefreshBadge">Auto refresh ready</div>
           </div>
         </header>
 
@@ -79,9 +78,12 @@
                   <h3>Recent Activity</h3>
                   <p class="card-note">Latest dashboard saves and form activity.</p>
                 </div>
-                <button class="ghost-btn small" id="refreshAnalyticsBtn" type="button">Refresh</button>
+                <div class="inline-actions">
+                  <button class="ghost-btn small" id="viewAllActivityBtn" type="button">View All Activity</button>
+                  <button class="ghost-btn small" id="refreshAnalyticsBtn" type="button">Refresh</button>
+                </div>
               </div>
-              <div class="activity-list" id="activityList"></div>
+              <div class="activity-list compact-list" id="activityList"></div>
             </article>
             <article class="card">
               <div class="card-head">
@@ -96,45 +98,46 @@
         </section>
 
         <section class="panel" data-panel="content">
-          <div class="three-col-grid">
-            <article class="card preview-card preview-span">
-              <div class="card-head">
-                <div>
-                  <h3>Live Site Preview</h3>
-                  <p class="card-note">Pick a page, save changes, then refresh the preview.</p>
-                </div>
-                <div class="inline-actions">
-                  <select id="previewPageSelect" aria-label="Preview page"></select>
-                  <button class="ghost-btn small" id="refreshPreviewBtn" type="button">Refresh Preview</button>
-                  <a class="ghost-btn small" id="openPreviewBtn" target="_blank" rel="noopener noreferrer">Open Page</a>
-                </div>
+          <article class="card preview-card">
+            <div class="card-head">
+              <div>
+                <h3>Live Site Preview</h3>
+                <p class="card-note">Pick a page, save changes, then refresh the preview.</p>
               </div>
-              <iframe class="site-preview-frame" id="sitePreviewFrame" title="Website preview"></iframe>
-            </article>
-
-            <article class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Media Library</h3>
-                  <p class="card-note">Logo, videos, and page imagery with visual thumbnails.</p>
-                </div>
+              <div class="inline-actions">
+                <select id="previewPageSelect" aria-label="Preview page"></select>
+                <button class="ghost-btn small" id="refreshPreviewBtn" type="button">Refresh Preview</button>
+                <a class="ghost-btn small" id="openPreviewBtn" target="_blank" rel="noopener noreferrer">Open Page</a>
               </div>
-              <div class="media-library compact" id="mediaLibrary"></div>
-            </article>
-          </div>
+            </div>
+            <iframe class="site-preview-frame" id="sitePreviewFrame" title="Website preview"></iframe>
+          </article>
 
           <article class="card">
             <div class="card-head">
               <div>
+                <h3>Media Library</h3>
+                <p class="card-note">Drag, drop, browse, or paste a URL for images and video anywhere on the site.</p>
+              </div>
+            </div>
+            <div class="media-library media-grid" id="mediaLibrary"></div>
+          </article>
+
+          <article class="card workbench-card">
+            <div class="card-head">
+              <div>
                 <h3>Visual Content Editor</h3>
-                <p class="card-note">Edit every page section, cards, links, buttons, and messages visually.</p>
+                <p class="card-note">Use the category tree to edit one section at a time without long scrolling.</p>
               </div>
               <div class="inline-actions">
                 <button class="ghost-btn small" id="resetContentBtn" type="button">Reset to Default</button>
                 <button class="primary-btn" id="saveContentBtn" type="button">Save Content</button>
               </div>
             </div>
-            <div class="editor-sections" id="contentSections"></div>
+            <div class="workbench-layout">
+              <aside class="tree-nav" id="contentTree"></aside>
+              <div class="tree-detail" id="contentDetail"></div>
+            </div>
           </article>
 
           <article class="card">
@@ -151,83 +154,21 @@
         </section>
 
         <section class="panel" data-panel="theme">
-          <div class="three-col-grid">
-            <article class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Typography</h3>
-                  <p class="card-note">Font family and readable size controls for every major text type.</p>
-                </div>
-              </div>
-              <div class="field-stack">
-                <label class="field">
-                  <span>Font Family</span>
-                  <select id="fontFamily" aria-label="Font family"></select>
-                </label>
-              </div>
-              <div class="slider-stack" id="typographyControls"></div>
-            </article>
-
-            <article class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Light Theme</h3>
-                  <p class="card-note">Colors used when the public site is in light mode.</p>
-                </div>
-              </div>
-              <div class="color-grid" id="lightPaletteEditor"></div>
-            </article>
-
-            <article class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Dark Theme</h3>
-                  <p class="card-note">Colors used when the public site is in dark mode.</p>
-                </div>
-              </div>
-              <div class="color-grid" id="darkPaletteEditor"></div>
-            </article>
-          </div>
-
-          <article class="card">
+          <article class="card workbench-card">
             <div class="card-head">
               <div>
-                <h3>Theme Preview</h3>
-                <p class="card-note">Live mockups using the current font and color controls.</p>
+                <h3>Theme Editor</h3>
+                <p class="card-note">Adjust fonts, colors, previews, refresh timing, and theme import/export from one compact workspace.</p>
               </div>
               <div class="inline-actions">
                 <button class="ghost-btn small" id="resetSettingsBtn" type="button">Reset to Default</button>
                 <button class="primary-btn" id="saveSettingsBtn" type="button">Save Theme</button>
               </div>
             </div>
-            <div class="theme-preview-grid" id="themePreviewGrid"></div>
-          </article>
-
-          <article class="card">
-            <div class="card-head">
-              <div>
-                <h3>Site Settings</h3>
-                <p class="card-note">Basic endpoint and dashboard refresh settings.</p>
-              </div>
-              <div class="inline-actions">
-                <button class="ghost-btn small" id="applySettingsFieldsBtn" type="button">Apply Settings</button>
-              </div>
+            <div class="workbench-layout">
+              <aside class="tree-nav" id="themeTree"></aside>
+              <div class="tree-detail" id="themeDetail"></div>
             </div>
-            <div class="two-col-grid compact-grid">
-              <label class="field">
-                <span>API Base URL</span>
-                <input id="apiBaseUrl" type="text" />
-              </label>
-              <label class="field">
-                <span>Analytics Refresh (seconds)</span>
-                <input id="dashboardRefreshSeconds" type="number" min="5" step="5" />
-              </label>
-            </div>
-            <label class="field">
-              <span>Traffic Sources</span>
-              <textarea id="trafficSourcesEditor" rows="4"></textarea>
-              <small>One source per line.</small>
-            </label>
           </article>
 
           <article class="card">
@@ -244,27 +185,18 @@
         </section>
 
         <section class="panel" data-panel="assets">
-          <div class="two-col-grid">
-            <article class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Media Gallery</h3>
-                  <p class="card-note">Swap images and videos anywhere on the website.</p>
-                </div>
+          <article class="card workbench-card">
+            <div class="card-head">
+              <div>
+                <h3>Media & Forms</h3>
+                <p class="card-note">Switch between media, contact form, project form, and newsletter settings from one compact tree.</p>
               </div>
-              <div class="media-library" id="assetMediaLibrary"></div>
-            </article>
-
-            <article class="card">
-              <div class="card-head">
-                <div>
-                  <h3>Forms & Messages</h3>
-                  <p class="card-note">Edit placeholders, button labels, and success messages visually.</p>
-                </div>
-              </div>
-              <div class="editor-sections compact" id="formsSections"></div>
-            </article>
-          </div>
+            </div>
+            <div class="workbench-layout">
+              <aside class="tree-nav" id="assetsTree"></aside>
+              <div class="tree-detail" id="assetsDetail"></div>
+            </div>
+          </article>
         </section>
 
         <section class="panel" data-panel="analytics">
@@ -307,8 +239,11 @@
                   <h3>Change History</h3>
                   <p class="card-note">Recent staff and admin actions with timestamps.</p>
                 </div>
+                <div class="inline-actions">
+                  <button class="ghost-btn small" id="viewAllChangesBtn" type="button">View All</button>
+                </div>
               </div>
-              <div class="history-list" id="changeHistoryList"></div>
+              <div class="history-list compact-list" id="changeHistoryList"></div>
             </article>
           </div>
         </section>
@@ -346,8 +281,11 @@
                   <h3>Admin Controls</h3>
                   <p class="card-note">Track changes, reset credentials, and control account access.</p>
                 </div>
+                <div class="inline-actions">
+                  <button class="ghost-btn small" id="viewAllTeamHistoryBtn" type="button">View All</button>
+                </div>
               </div>
-              <div class="history-list" id="teamHistoryList"></div>
+              <div class="history-list compact-list" id="teamHistoryList"></div>
             </article>
           </div>
 
@@ -396,6 +334,19 @@
           </article>
         </section>
       </main>
+    </div>
+
+    <div class="dashboard-modal hidden" id="activityModal" role="dialog" aria-modal="true" aria-labelledby="activityModalTitle">
+      <div class="dashboard-modal-card">
+        <div class="card-head">
+          <div>
+            <h3 id="activityModalTitle">Activity</h3>
+            <p class="card-note">Scrollable history across the dashboard.</p>
+          </div>
+          <button class="ghost-btn small" id="closeActivityModalBtn" type="button">Close</button>
+        </div>
+        <div class="history-list modal-history-list" id="activityModalList"></div>
+      </div>
     </div>
 
     <script src="/dashboard/app.js"></script>

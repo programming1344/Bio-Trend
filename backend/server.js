@@ -9,6 +9,8 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const DASHBOARD_DIR = path.join(ROOT_DIR, "dashboard");
 const SHARED_DATA_DIR = path.join(ROOT_DIR, "data");
 const LOCAL_DATA_DIR = path.join(__dirname, "data");
+const PUBLIC_DIR = path.join(ROOT_DIR, "public");
+const UPLOADS_DIR = path.join(PUBLIC_DIR, "uploads");
 const PORT = Number(process.env.PORT || 8787);
 
 const DEFAULT_ADMIN = {
@@ -120,6 +122,19 @@ function baseAnalytics() {
   };
 }
 
+const MEDIA_EXTENSIONS = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "image/svg+xml": ".svg",
+  "video/mp4": ".mp4",
+  "video/quicktime": ".mov",
+  "video/webm": ".webm",
+  "video/x-m4v": ".m4v",
+};
+
 function normalizeAnalytics(analytics) {
   return {
     ...baseAnalytics(),
@@ -179,6 +194,7 @@ async function ensureStorage() {
       role: "admin",
     }),
   ]);
+  await fs.mkdir(UPLOADS_DIR, { recursive: true });
 }
 
 async function readJson(filePath) {
@@ -229,7 +245,7 @@ async function recordActivity(type, label, meta = {}, actor = null) {
   if (type === "settings-save") analytics.settingsSaves += 1;
   if (type === "form-submit") analytics.formSubmissions += 1;
   if (type === "auth-login") analytics.authLogins += 1;
-  if (type === "team-user-create" || type === "team-user-update") analytics.teamChanges += 1;
+  if (type === "team-user-create" || type === "team-user-update" || type === "team-user-remove") analytics.teamChanges += 1;
 
   const nextAudit = [entry, ...audit].slice(0, 500);
 
@@ -333,6 +349,52 @@ function countEntries(entries, type) {
   return entries.filter((entry) => entry.type === type).length;
 }
 
+function sanitizeFileStem(name) {
+  return String(name || "asset")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-z0-9-_]+/gi, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase() || "asset";
+}
+
+function extensionFromUpload(fileName, mimeType) {
+  const explicit = path.extname(String(fileName || "")).toLowerCase();
+  if (/^\.(png|jpe?g|webp|gif|svg|mp4|mov|webm|m4v)$/.test(explicit)) {
+    return explicit === ".jpeg" ? ".jpg" : explicit;
+  }
+  return MEDIA_EXTENSIONS[String(mimeType || "").toLowerCase()] || "";
+}
+
+async function saveUploadedMedia(body) {
+  const fileName = String(body.fileName || "").trim();
+  const mimeType = String(body.mimeType || "").trim().toLowerCase();
+  const data = String(body.data || "");
+  const match = data.match(/^data:([^;]+);base64,(.+)$/);
+
+  if (!match) {
+    throw new Error("Invalid media payload");
+  }
+
+  const extension = extensionFromUpload(fileName, mimeType || match[1]);
+  if (!extension) {
+    throw new Error("Unsupported media type");
+  }
+
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length) {
+    throw new Error("Uploaded media is empty");
+  }
+  if (buffer.length > 80 * 1024 * 1024) {
+    throw new Error("Uploaded media exceeds 80 MB");
+  }
+
+  const targetName = `${Date.now()}-${sanitizeFileStem(fileName)}${extension}`;
+  const targetPath = path.join(UPLOADS_DIR, targetName);
+  await fs.writeFile(targetPath, buffer);
+  return `/uploads/${targetName}`;
+}
+
 function buildUsageSummary(users, audit) {
   return users
     .map((user) => {
@@ -344,7 +406,10 @@ function buildUsageSummary(users, audit) {
           dashboardViews: countEntries(entries, "dashboard-view"),
           contentSaves: countEntries(entries, "content-save"),
           themeSaves: countEntries(entries, "settings-save"),
-          teamChanges: countEntries(entries, "team-user-create") + countEntries(entries, "team-user-update"),
+          teamChanges:
+            countEntries(entries, "team-user-create") +
+            countEntries(entries, "team-user-update") +
+            countEntries(entries, "team-user-remove"),
           totalActions: entries.length,
         },
         lastActionAt: entries[0]?.createdAt ?? null,
@@ -582,6 +647,22 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/media/upload") {
+    const context = await requireAuth(request, response);
+    if (!context) return;
+
+    const body = await parseBody(request);
+    const assetPath = await saveUploadedMedia(body);
+    await recordActivity(
+      "media-upload",
+      `Media uploaded: ${body.fileName || "asset"}`,
+      { path: assetPath, mimeType: body.mimeType || null },
+      context.user
+    );
+    sendJson(response, 201, { ok: true, path: assetPath });
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/analytics/event") {
     const context = await requireAuth(request, response);
     if (!context) return;
@@ -713,6 +794,48 @@ async function handleApi(request, response, url) {
       context.user
     );
     sendJson(response, 200, { ok: true, user: sanitizeUser(target) });
+    return;
+  }
+
+  if (request.method === "DELETE" && /^\/api\/team\/users\/[^/]+$/.test(url.pathname)) {
+    const context = await requireAdmin(request, response);
+    if (!context) return;
+
+    const targetId = url.pathname.split("/").pop();
+    const users = await readJson(FILES.users);
+    const target = users.find((user) => user.id === targetId);
+
+    if (!target) {
+      sendJson(response, 404, { error: "User not found" });
+      return;
+    }
+
+    if (target.id === context.user.id) {
+      sendJson(response, 400, { error: "You cannot remove your own account" });
+      return;
+    }
+
+    if (target.role === "admin") {
+      sendJson(response, 400, { error: "Admin accounts cannot be removed here" });
+      return;
+    }
+
+    const nextUsers = users.filter((user) => user.id !== target.id);
+    await writeJson(FILES.users, nextUsers);
+
+    for (const [token, session] of sessions.entries()) {
+      if (session.userId === target.id) {
+        sessions.delete(token);
+      }
+    }
+
+    await recordActivity(
+      "team-user-remove",
+      `Staff account removed for ${target.displayName}`,
+      { targetUserId: target.id, targetUsername: target.username },
+      context.user
+    );
+    sendJson(response, 200, { ok: true });
     return;
   }
 

@@ -1454,7 +1454,7 @@ body {
 }
 
 .footer-links-list a:hover {
-  color: var(--navy);
+  color: #4ade80 !important;
   padding-left: 4px;
 }
 
@@ -1464,7 +1464,7 @@ body {
 
 .footer-highlight-link {
   font-weight: 700;
-  color: var(--navy) !important;
+  color: #4ade80 !important;
 }
 
 .footer-contact-list li {
@@ -1477,7 +1477,7 @@ body {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--navy);
+  color: #26c281;
   font-weight: 700;
 }
 
@@ -1489,7 +1489,7 @@ body {
 }
 
 a.contact-val:hover {
-  color: var(--navy) !important;
+  color: #4ade80 !important;
   text-decoration: underline;
 }
 
@@ -1573,7 +1573,7 @@ a.contact-val:hover {
 }
 
 .footer-policies a:hover {
-  color: var(--navy);
+  color: #4ade80 !important;
 }
 
 @media (max-width: 960px) {
@@ -2476,7 +2476,7 @@ a.contact-val:hover {
 
 .calc-results {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 20px;
   padding-top: 24px;
   border-top: 1px solid var(--line);
@@ -2745,11 +2745,6 @@ a.contact-val:hover {
   background-size: 16px;
   padding-right: 40px !important;
   cursor: pointer;
-}
-
-.form-group select option {
-  background-color: var(--card-bg) !important;
-  color: var(--ink) !important;
 }
 
 .submit-btn {
@@ -3683,5 +3678,317 @@ a.contact-val:hover {
   .modal-close-btn {
     top: 16px;
     right: 16px;
+  }
+}
+
+/* Final responsive hardening */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img,
+video,
+svg,
+canvas {
+  max-width: 100%;
+}
+
+.page-intro h1,
+.page-intro p,
+.section-heading,
+.hero-copy,
+.rotating-title span,
+.proj-content h3,
+.proj-content p,
+.contact-info-panel p,
+.contact-val,
+.footer-links-list a,
+.footer-policies a,
+.newsletter-text {
+  overflow-wrap: anywhere;
+}
+
+.footer-shell > *,
+.contact-grid > *,
+.section-process > *,
+.impact > *,
+.project-layout > * {
+  min-width: 0;
+}
+
+.table-container {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1180px) {
+  .offering-grid,
+  .stats-grid,
+  .why-grid,
+  .project-grid,
+  .impact-stats-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .footer-shell {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 36px;
+  }
+
+  .section-process,
+  .impact,
+  .contact-band,
+  .project-layout {
+    gap: 32px;
+  }
+}
+
+@media (max-width: 980px) {
+  .page-intro {
+    padding: 132px 18px 56px;
+  }
+
+  .page-intro h1 {
+    max-width: 100%;
+    font-size: calc(clamp(2rem, 8vw, 3.45rem) * var(--type-scale-page-title, 1));
+  }
+
+  .page-intro p,
+  .section-heading,
+  .hero-copy {
+    max-width: 100%;
+  }
+
+  .section,
+  .impact,
+  .contact-band,
+  .site-footer {
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+
+  .section-process,
+  .impact,
+  .project-layout,
+  .contact-band,
+  .contact-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .contact-band .primary-action {
+    justify-self: start;
+  }
+
+  .timeline-container {
+    margin-top: 28px;
+  }
+
+  .timeline-step {
+    grid-template-columns: 44px 1fr;
+    gap: 14px;
+  }
+
+  .timeline-container::before {
+    left: 21px;
+  }
+
+  .step-badge {
+    width: 44px;
+    height: 44px;
+    font-size: 0.95rem;
+  }
+
+  .step-content,
+  .calc-card,
+  .contact-form-panel,
+  .project-card,
+  .impact-card {
+    border-radius: 14px;
+  }
+
+  .contact-grid {
+    gap: 28px;
+  }
+}
+
+@media (max-width: 760px) {
+  .offering-grid,
+  .stats-grid,
+  .why-grid,
+  .project-grid,
+  .impact-stats-cards,
+  .calc-results,
+  .footer-shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .section {
+    padding-top: clamp(52px, 8vw, 72px);
+    padding-bottom: clamp(52px, 8vw, 72px);
+  }
+
+  .section-heading {
+    margin-bottom: 24px;
+  }
+
+  .table-container {
+    margin-top: 24px;
+    border-radius: 14px;
+  }
+
+  .tech-specs-table {
+    min-width: 640px;
+  }
+
+  .tech-specs-table th,
+  .tech-specs-table td {
+    padding: 14px 16px;
+  }
+
+  .calc-card,
+  .contact-form-panel,
+  .modal-card {
+    padding: 24px;
+    border-radius: 18px;
+  }
+
+  .offering,
+  .why-card,
+  .stat-card,
+  .proj-content,
+  .impact-card,
+  .step-content {
+    padding: 22px;
+  }
+
+  .site-footer {
+    padding-top: 64px !important;
+    padding-bottom: 28px !important;
+  }
+
+  .footer-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .footer-policies {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .brand-col .brand-desc {
+    max-width: 100%;
+  }
+
+  .hero-actions {
+    width: 100%;
+  }
+
+  .hero .primary-action,
+  .hero .secondary-action {
+    width: min(100%, 320px);
+    justify-content: center;
+  }
+}
+
+@media (max-width: 540px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  .page-intro {
+    padding: 122px 16px 48px;
+  }
+
+  .page-intro h1 {
+    font-size: calc(clamp(1.9rem, 10vw, 2.7rem) * var(--type-scale-page-title, 1));
+    line-height: 1.08;
+  }
+
+  h2 {
+    font-size: calc(clamp(1.65rem, 8vw, 2.2rem) * var(--type-scale-section-title, 1));
+  }
+
+  .hero-content {
+    width: 100% !important;
+  }
+
+  .hero-copy {
+    width: 100%;
+  }
+
+  .hero-actions {
+    gap: 8px;
+  }
+
+  .hero .primary-action,
+  .hero .secondary-action {
+    width: 100%;
+    max-width: none;
+  }
+
+  .site-nav.mobile-open {
+    justify-content: flex-start !important;
+    padding: 88px 18px 28px !important;
+  }
+
+  .site-nav.mobile-open a,
+  .site-nav.mobile-open .nav-action-mobile,
+  .site-nav.mobile-open .theme-toggle-mobile {
+    width: min(100%, 22rem) !important;
+    font-size: 1.02rem !important;
+  }
+
+  .site-nav.mobile-open .theme-toggle-mobile {
+    min-height: 48px !important;
+  }
+
+  .fullscreen-video-button {
+    left: 12px;
+    right: 12px;
+    justify-content: center;
+  }
+
+  .timeline-container::before {
+    left: 18px;
+  }
+
+  .timeline-step {
+    grid-template-columns: 38px 1fr;
+    gap: 12px;
+  }
+
+  .step-badge {
+    width: 38px;
+    height: 38px;
+    font-size: 0.82rem;
+    border-width: 3px;
+  }
+
+  .step-content {
+    padding: 18px;
+  }
+
+  .contact-info-panel h2,
+  .modal-header-block h2 {
+    font-size: 1.75rem;
+  }
+
+  .contact-info-panel p,
+  .hero-copy,
+  .newsletter-text {
+    font-size: 0.95rem;
+  }
+
+  .brand-col .footer-brand {
+    flex-wrap: wrap;
+  }
+
+  .newsletter-form input {
+    padding-right: 48px;
   }
 }

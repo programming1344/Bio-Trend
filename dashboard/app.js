@@ -15,6 +15,31 @@ const DEFAULT_FONT_OPTIONS = [
   "\"Manrope\", system-ui, -apple-system, sans-serif",
   "\"DM Sans\", system-ui, -apple-system, sans-serif",
   "\"Nunito Sans\", system-ui, -apple-system, sans-serif",
+  "\"Plus Jakarta Sans\", system-ui, -apple-system, sans-serif",
+  "\"Urbanist\", system-ui, -apple-system, sans-serif",
+  "\"Outfit\", system-ui, -apple-system, sans-serif",
+  "\"Sora\", system-ui, -apple-system, sans-serif",
+  "\"Space Grotesk\", system-ui, -apple-system, sans-serif",
+  "\"Montserrat\", system-ui, -apple-system, sans-serif",
+  "\"Lato\", system-ui, -apple-system, sans-serif",
+  "\"Open Sans\", system-ui, -apple-system, sans-serif",
+  "\"Work Sans\", system-ui, -apple-system, sans-serif",
+  "\"Mulish\", system-ui, -apple-system, sans-serif",
+  "\"Rubik\", system-ui, -apple-system, sans-serif",
+  "\"Kanit\", system-ui, -apple-system, sans-serif",
+  "\"Archivo\", system-ui, -apple-system, sans-serif",
+  "\"Barlow\", system-ui, -apple-system, sans-serif",
+  "\"Heebo\", system-ui, -apple-system, sans-serif",
+  "\"Public Sans\", system-ui, -apple-system, sans-serif",
+  "\"Source Sans 3\", system-ui, -apple-system, sans-serif",
+  "\"Lexend\", system-ui, -apple-system, sans-serif",
+  "\"IBM Plex Sans\", system-ui, -apple-system, sans-serif",
+  "\"Noto Sans\", system-ui, -apple-system, sans-serif",
+  "\"Cabin\", system-ui, -apple-system, sans-serif",
+  "\"Figtree\", system-ui, -apple-system, sans-serif",
+  "\"Hind\", system-ui, -apple-system, sans-serif",
+  "\"Onest\", system-ui, -apple-system, sans-serif",
+  "\"Be Vietnam Pro\", system-ui, -apple-system, sans-serif",
 ];
 
 const DEFAULT_DESIGN_PALETTES = {
@@ -61,51 +86,55 @@ const PALETTE_FIELDS = [
 
 const CONTENT_GROUPS = [
   {
+    id: "site",
     label: "Site Identity",
-    description: "Brand name, logo, navigation links, social links, and policy links.",
+    description: "Brand name, logo, navigation links, and social links.",
     path: ["site"],
   },
   {
+    id: "hero",
     label: "Hero Landing",
-    description: "Landing video, hero text, action buttons, and timed hide windows.",
+    description: "Landing video, hero text, and action buttons.",
     path: ["hero"],
   },
   {
+    id: "home",
     label: "Home Page",
     description: "Homepage stats, advantages, and explore section content.",
     path: ["home"],
   },
   {
+    id: "solutions",
     label: "Solutions Page",
     description: "Solutions intro, offering cards, and technical specification table.",
     path: ["pages", "solutions"],
   },
   {
+    id: "process",
     label: "Process Page",
     description: "Workflow visuals, steps, and timeline content.",
     path: ["pages", "process"],
   },
   {
+    id: "impact",
     label: "Impact Page",
     description: "Impact messaging, calculator copy, and result labels.",
     path: ["pages", "impact"],
   },
   {
+    id: "projects",
     label: "Projects Page",
     description: "Project cards, locations, stats, statuses, and project images.",
     path: ["pages", "projects"],
   },
   {
+    id: "contact",
     label: "Contact Page",
     description: "Contact page intro, panel copy, address, and inquiry details.",
     path: ["pages", "contact"],
   },
   {
-    label: "Forms",
-    description: "Contact form, project modal, newsletter, labels, placeholders, and success copy.",
-    path: ["forms"],
-  },
-  {
+    id: "footer",
     label: "Footer",
     description: "Footer description, highlight link, and contact information.",
     path: ["footer"],
@@ -114,21 +143,69 @@ const CONTENT_GROUPS = [
 
 const FORM_GROUPS = [
   {
+    id: "contactForm",
     label: "Contact Form",
     description: "Fields and confirmation messages for the contact page form.",
     path: ["forms", "contact"],
   },
   {
+    id: "projectModal",
     label: "Project Modal",
     description: "Project enquiry modal labels, placeholders, and messages.",
     path: ["forms", "projectModal"],
   },
   {
+    id: "newsletter",
     label: "Newsletter Form",
     description: "Newsletter title, supporting text, placeholder, and success message.",
     path: ["forms", "newsletter"],
   },
 ];
+
+const ASSET_GROUPS = [
+  {
+    id: "mediaLibrary",
+    label: "Media Library",
+    description: "Images and videos used across all pages.",
+    type: "media",
+  },
+  ...FORM_GROUPS.map((group) => ({ ...group, type: "form" })),
+];
+
+const THEME_SECTIONS = [
+  {
+    id: "typography",
+    label: "Typography",
+    description: "Font family and readable size controls for every major text type.",
+  },
+  {
+    id: "lightPalette",
+    label: "Light Palette",
+    description: "Colors used when the public site is in light mode.",
+  },
+  {
+    id: "darkPalette",
+    label: "Dark Palette",
+    description: "Colors used when the public site is in dark mode.",
+  },
+  {
+    id: "preview",
+    label: "Theme Preview",
+    description: "Live mockups using the current font and color controls.",
+  },
+  {
+    id: "settings",
+    label: "Dashboard Settings",
+    description: "Refresh interval, API base URL, and analytics sources.",
+  },
+  {
+    id: "importExport",
+    label: "Import / Export",
+    description: "Bring in a saved theme file or export the current settings.",
+  },
+];
+
+const HIDDEN_CONTENT_PATHS = new Set(["site.footerPolicies", "hero.uiWindows"]);
 
 const state = {
   auth: {
@@ -150,6 +227,15 @@ const state = {
   autoRefreshId: null,
   statusResetId: null,
   dashboardViewTracked: false,
+  contentSelection: {
+    groupId: CONTENT_GROUPS[0].id,
+    subKey: null,
+  },
+  assetsSelection: {
+    groupId: ASSET_GROUPS[0].id,
+    subKey: null,
+  },
+  themeSelection: THEME_SECTIONS[0].id,
 };
 
 const refs = {
@@ -168,23 +254,20 @@ const refs = {
   panelTitle: document.getElementById("panelTitle"),
   healthDot: document.getElementById("healthDot"),
   healthText: document.getElementById("healthText"),
+  autoRefreshBadge: document.getElementById("autoRefreshBadge"),
   metricsGrid: document.getElementById("metricsGrid"),
   summaryGrid: document.getElementById("summaryGrid"),
   activityList: document.getElementById("activityList"),
-  contentSections: document.getElementById("contentSections"),
+  viewAllActivityBtn: document.getElementById("viewAllActivityBtn"),
+  contentTree: document.getElementById("contentTree"),
+  contentDetail: document.getElementById("contentDetail"),
   contentEditor: document.getElementById("contentEditor"),
-  settingsEditor: document.getElementById("settingsEditor"),
   mediaLibrary: document.getElementById("mediaLibrary"),
-  assetMediaLibrary: document.getElementById("assetMediaLibrary"),
-  formsSections: document.getElementById("formsSections"),
-  fontFamily: document.getElementById("fontFamily"),
-  typographyControls: document.getElementById("typographyControls"),
-  lightPaletteEditor: document.getElementById("lightPaletteEditor"),
-  darkPaletteEditor: document.getElementById("darkPaletteEditor"),
-  themePreviewGrid: document.getElementById("themePreviewGrid"),
-  apiBaseUrl: document.getElementById("apiBaseUrl"),
-  dashboardRefreshSeconds: document.getElementById("dashboardRefreshSeconds"),
-  trafficSourcesEditor: document.getElementById("trafficSourcesEditor"),
+  themeTree: document.getElementById("themeTree"),
+  themeDetail: document.getElementById("themeDetail"),
+  settingsEditor: document.getElementById("settingsEditor"),
+  assetsTree: document.getElementById("assetsTree"),
+  assetsDetail: document.getElementById("assetsDetail"),
   previewPageSelect: document.getElementById("previewPageSelect"),
   refreshPreviewBtn: document.getElementById("refreshPreviewBtn"),
   openPreviewBtn: document.getElementById("openPreviewBtn"),
@@ -194,6 +277,7 @@ const refs = {
   adminAnalyticsRow: document.getElementById("adminAnalyticsRow"),
   teamUsageGrid: document.getElementById("teamUsageGrid"),
   changeHistoryList: document.getElementById("changeHistoryList"),
+  viewAllChangesBtn: document.getElementById("viewAllChangesBtn"),
   teamPanel: document.getElementById("teamPanel"),
   createStaffForm: document.getElementById("createStaffForm"),
   staffDisplayName: document.getElementById("staffDisplayName"),
@@ -201,10 +285,15 @@ const refs = {
   staffPassword: document.getElementById("staffPassword"),
   staffFormError: document.getElementById("staffFormError"),
   teamHistoryList: document.getElementById("teamHistoryList"),
+  viewAllTeamHistoryBtn: document.getElementById("viewAllTeamHistoryBtn"),
   userGrid: document.getElementById("userGrid"),
   contactTable: document.getElementById("contactTable"),
   projectTable: document.getElementById("projectTable"),
   newsletterTable: document.getElementById("newsletterTable"),
+  activityModal: document.getElementById("activityModal"),
+  activityModalTitle: document.getElementById("activityModalTitle"),
+  activityModalList: document.getElementById("activityModalList"),
+  closeActivityModalBtn: document.getElementById("closeActivityModalBtn"),
 };
 
 function getDraftKey(type) {
@@ -341,6 +430,39 @@ function humanizePath(path) {
   return path
     .map((segment) => (typeof segment === "number" ? `Item ${segment + 1}` : humanizeKey(segment)))
     .join(" / ");
+}
+
+function joinPath(path) {
+  return path.map((segment) => String(segment)).join(".");
+}
+
+function isHiddenContentPath(path) {
+  return HIDDEN_CONTENT_PATHS.has(joinPath(path));
+}
+
+function isHeroVideoSourcesPath(path) {
+  return joinPath(path) === "hero.videoSources";
+}
+
+function ensureContentEditingShape(content) {
+  content.hero ||= {};
+  content.hero.videoSources ||= {};
+  const unifiedHeroVideo =
+    content.hero.videoSource || content.hero.videoSources.mp4 || content.hero.videoSources.mov || "";
+  content.hero.videoSources.mp4 = unifiedHeroVideo;
+  content.hero.videoSources.mov = unifiedHeroVideo;
+  return content;
+}
+
+function getUnifiedHeroVideoValue() {
+  return state.content?.hero?.videoSources?.mp4 || state.content?.hero?.videoSources?.mov || "";
+}
+
+function setUnifiedHeroVideoValue(value) {
+  state.content.hero ||= {};
+  state.content.hero.videoSources ||= {};
+  state.content.hero.videoSources.mp4 = value;
+  state.content.hero.videoSources.mov = value;
 }
 
 function formatDate(value) {
@@ -500,6 +622,36 @@ function resolveMediaUrl(value) {
   if (!value) return "";
   if (/^https?:\/\//i.test(value)) return value;
   return `${PREVIEW_BASE}${value.startsWith("/") ? value : `/${value}`}`;
+}
+
+function setMediaValueByPath(path, nextValue) {
+  if (isHeroVideoSourcesPath(path) || joinPath(path) === "hero.videoSources.mp4" || joinPath(path) === "hero.videoSources.mov") {
+    setUnifiedHeroVideoValue(nextValue);
+    return;
+  }
+  setValueByPath(state.content, path, nextValue);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Failed to read the selected file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadMediaFile(file) {
+  const data = await readFileAsDataUrl(file);
+  const result = await api("/api/media/upload", {
+    method: "POST",
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type,
+      data,
+    }),
+  });
+  return result.path;
 }
 
 function getValueByPath(object, path) {
