@@ -392,6 +392,7 @@ function Hero({ onNavigate }) {
         playsInline
         preload="auto"
         aria-hidden="true"
+        poster="/Bio-Trend/assets/nature.jpg"
         onLoadedMetadata={syncHeroVisibility}
         onPlay={syncHeroVisibility}
         onSeeked={syncHeroVisibility}
