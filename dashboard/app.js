@@ -393,6 +393,7 @@ function clearSession() {
   clearInterval(state.autoRefreshId);
   localStorage.removeItem(AUTH_KEYS.token);
   localStorage.removeItem(AUTH_KEYS.user);
+  closeActivityModal();
   updateSessionUI();
 }
 
@@ -449,6 +450,7 @@ function ensureContentEditingShape(content) {
   content.hero.videoSources ||= {};
   const unifiedHeroVideo =
     content.hero.videoSource || content.hero.videoSources.mp4 || content.hero.videoSources.mov || "";
+  content.hero.videoSource = unifiedHeroVideo;
   content.hero.videoSources.mp4 = unifiedHeroVideo;
   content.hero.videoSources.mov = unifiedHeroVideo;
   return content;
@@ -461,6 +463,7 @@ function getUnifiedHeroVideoValue() {
 function setUnifiedHeroVideoValue(value) {
   state.content.hero ||= {};
   state.content.hero.videoSources ||= {};
+  state.content.hero.videoSource = value;
   state.content.hero.videoSources.mp4 = value;
   state.content.hero.videoSources.mov = value;
 }
@@ -776,6 +779,116 @@ function syncSettingsDraft() {
   saveDraft("settings", state.settings);
 }
 
+function createMediaControl(path, value, { compact = false } = {}) {
+  const shell = document.createElement("div");
+  shell.className = "media-control";
+
+  let currentValue = value || "";
+  let preview = createMediaPreview(currentValue, compact);
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = currentValue;
+  input.placeholder = "Paste an image or video URL";
+
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/*,video/*";
+  fileInput.className = "hidden";
+
+  const browseButton = createButton("ghost-btn small", "Browse", () => fileInput.click());
+  const clearButton = createButton("ghost-btn small", "Clear", () => applyValue(""));
+
+  const status = document.createElement("small");
+  status.className = "media-status";
+  status.textContent = "Drag and drop, browse, or paste a direct URL.";
+
+  const dropzone = document.createElement("div");
+  dropzone.className = "media-dropzone";
+  dropzone.textContent = "Drop file here";
+
+  const actions = document.createElement("div");
+  actions.className = "inline-actions";
+  actions.append(browseButton, clearButton);
+
+  function updatePreview(nextValue) {
+    const nextPreview = createMediaPreview(nextValue, compact);
+    preview.replaceWith(nextPreview);
+    preview = nextPreview;
+    shell.insertBefore(preview, input);
+  }
+
+  function applyValue(nextValue, { rerender = true, syncInput = true } = {}) {
+    currentValue = nextValue.trim();
+    setMediaValueByPath(path, currentValue);
+    updatePreview(currentValue);
+    if (syncInput) {
+      input.value = currentValue;
+    }
+    syncContentDraft();
+    if (rerender) {
+      renderMediaPanels();
+    }
+  }
+
+  async function handleSelectedFile(file) {
+    if (!file) return;
+
+    status.textContent = "Uploading...";
+    fileInput.disabled = true;
+    browseButton.disabled = true;
+    clearButton.disabled = true;
+
+    try {
+      const uploadedPath = await uploadMediaFile(file);
+      applyValue(uploadedPath);
+      status.textContent = `Uploaded ${file.name}`;
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      fileInput.disabled = false;
+      browseButton.disabled = false;
+      clearButton.disabled = false;
+      fileInput.value = "";
+    }
+  }
+
+  input.addEventListener("input", (event) => {
+    applyValue(event.target.value, { rerender: false, syncInput: false });
+    status.textContent = "URL updated locally. Save content to publish.";
+  });
+
+  input.addEventListener("change", () => {
+    renderMediaPanels();
+  });
+
+  fileInput.addEventListener("change", (event) => {
+    handleSelectedFile(event.target.files?.[0]).catch(console.error);
+  });
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.add("dragging");
+    });
+  });
+
+  ["dragleave", "dragend", "drop"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.remove("dragging");
+    });
+  });
+
+  dropzone.addEventListener("drop", (event) => {
+    const file = event.dataTransfer?.files?.[0];
+    handleSelectedFile(file).catch(console.error);
+  });
+
+  shell.append(preview, input, actions, dropzone, status, fileInput);
+  return shell;
+}
+
 function renderPrimitiveField(path, value) {
   const key = String(path[path.length - 1]);
   const field = document.createElement("label");
@@ -786,22 +899,7 @@ function renderPrimitiveField(path, value) {
   field.appendChild(caption);
 
   if (isMediaPath(value)) {
-    let preview = createMediaPreview(value);
-    field.appendChild(preview);
-
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = value;
-    input.addEventListener("input", (event) => {
-      setValueByPath(state.content, path, event.target.value);
-      const nextPreview = createMediaPreview(event.target.value);
-      preview.replaceWith(nextPreview);
-      preview = nextPreview;
-      field.insertBefore(preview, input);
-      syncContentDraft();
-    });
-    input.addEventListener("change", () => renderMediaPanels());
-    field.appendChild(input);
+    field.appendChild(createMediaControl(path, value));
     return field;
   }
 
@@ -824,7 +922,7 @@ function renderPrimitiveField(path, value) {
 
   if (typeof value === "boolean") {
     const toggle = document.createElement("label");
-    toggle.className = "field";
+    toggle.className = "toggle-row";
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = value;
@@ -832,7 +930,12 @@ function renderPrimitiveField(path, value) {
       setValueByPath(state.content, path, event.target.checked);
       syncContentDraft();
     });
-    toggle.appendChild(checkbox);
+    const badge = document.createElement("span");
+    badge.textContent = value ? "Enabled" : "Disabled";
+    checkbox.addEventListener("change", () => {
+      badge.textContent = checkbox.checked ? "Enabled" : "Disabled";
+    });
+    toggle.append(checkbox, badge);
     field.appendChild(toggle);
     return field;
   }
@@ -868,6 +971,57 @@ function renderPrimitiveField(path, value) {
   return field;
 }
 
+function isCompactObjectList(items) {
+  return (
+    items.length > 0 &&
+    items.every(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        Object.values(item).every((value) => value == null || ["string", "number", "boolean"].includes(typeof value)) &&
+        Object.keys(item).length <= 4
+    )
+  );
+}
+
+function createCompactObjectList(items, path) {
+  const list = document.createElement("div");
+  list.className = "compact-object-list";
+
+  items.forEach((item, index) => {
+    const card = document.createElement("article");
+    card.className = "compact-object-card";
+
+    const head = document.createElement("div");
+    head.className = "collection-head";
+
+    const heading = document.createElement("h4");
+    heading.textContent = getCollectionLabel(item, index);
+    head.appendChild(heading);
+    head.appendChild(
+      createButton("danger-btn small", "Remove", () => {
+        items.splice(index, 1);
+        syncContentDraft();
+        renderContentWorkbench();
+        renderAssetsWorkbench();
+      })
+    );
+
+    const grid = document.createElement("div");
+    grid.className = "compact-object-grid";
+
+    Object.entries(item).forEach(([key, entryValue]) => {
+      grid.appendChild(renderPrimitiveField([...path, index, key], entryValue));
+    });
+
+    card.append(head, grid);
+    list.appendChild(card);
+  });
+
+  return list;
+}
+
 function renderArrayEditor(items, path, depth = 0) {
   const wrapper = document.createElement("div");
   wrapper.className = "array-editor";
@@ -901,11 +1055,11 @@ function renderArrayEditor(items, path, depth = 0) {
 
       row.appendChild(control);
       row.appendChild(
-        createButton("danger-btn", "Remove", () => {
+        createButton("danger-btn small", "Remove", () => {
           items.splice(index, 1);
           syncContentDraft();
           renderContentWorkbench();
-          renderFormsWorkbench();
+          renderAssetsWorkbench();
         })
       );
       list.appendChild(row);
@@ -917,7 +1071,7 @@ function renderArrayEditor(items, path, depth = 0) {
         items.push(typeof items[0] === "number" ? 0 : "");
         syncContentDraft();
         renderContentWorkbench();
-        renderFormsWorkbench();
+        renderAssetsWorkbench();
       })
     );
     return wrapper;
@@ -943,7 +1097,7 @@ function renderArrayEditor(items, path, depth = 0) {
       });
 
       row.appendChild(
-        createButton("danger-btn", "Remove Row", () => {
+        createButton("danger-btn small", "Remove Row", () => {
           items.splice(rowIndex, 1);
           syncContentDraft();
           renderContentWorkbench();
@@ -963,6 +1117,19 @@ function renderArrayEditor(items, path, depth = 0) {
     return wrapper;
   }
 
+  if (isCompactObjectList(items)) {
+    wrapper.appendChild(createCompactObjectList(items, path));
+    wrapper.appendChild(
+      createButton("ghost-btn small", "Add Item", () => {
+        items.push(items[0] ? createEmptyFromShape(items[0]) : {});
+        syncContentDraft();
+        renderContentWorkbench();
+        renderAssetsWorkbench();
+      })
+    );
+    return wrapper;
+  }
+
   const collection = document.createElement("div");
   collection.className = "collection-list";
 
@@ -977,11 +1144,11 @@ function renderArrayEditor(items, path, depth = 0) {
     heading.textContent = getCollectionLabel(item, index);
     head.appendChild(heading);
     head.appendChild(
-      createButton("danger-btn", "Remove", () => {
+      createButton("danger-btn small", "Remove", () => {
         items.splice(index, 1);
         syncContentDraft();
         renderContentWorkbench();
-        renderFormsWorkbench();
+        renderAssetsWorkbench();
       })
     );
 
@@ -995,18 +1162,52 @@ function renderArrayEditor(items, path, depth = 0) {
       items.push(items[0] ? createEmptyFromShape(items[0]) : {});
       syncContentDraft();
       renderContentWorkbench();
-      renderFormsWorkbench();
+      renderAssetsWorkbench();
     })
   );
 
   return wrapper;
 }
 
+function getVisibleObjectEntries(object, path) {
+  return Object.entries(object).filter(([key]) => {
+    const childPath = [...path, key];
+    if (isHiddenContentPath(childPath)) return false;
+    if (joinPath(childPath) === "hero.videoSources.mov") return false;
+    return true;
+  });
+}
+
+function createUnifiedHeroVideoEditor(path) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "field-stack";
+
+  const field = document.createElement("label");
+  field.className = "field";
+
+  const caption = document.createElement("span");
+  caption.textContent = "Landing Video";
+  field.appendChild(caption);
+  field.appendChild(createMediaControl(path, getUnifiedHeroVideoValue()));
+  wrapper.appendChild(field);
+
+  const note = document.createElement("small");
+  note.className = "card-note";
+  note.textContent = "This single source updates both stored video fields for the hero.";
+  wrapper.appendChild(note);
+
+  return wrapper;
+}
+
 function renderObjectEditor(object, path, depth = 0) {
+  if (isHeroVideoSourcesPath(path)) {
+    return createUnifiedHeroVideoEditor(path);
+  }
+
   const wrapper = document.createElement("div");
   wrapper.className = `editor-grid ${depth > 0 ? "nested" : ""}`;
 
-  Object.entries(object).forEach(([key, value]) => {
+  getVisibleObjectEntries(object, path).forEach(([key, value]) => {
     const childPath = [...path, key];
 
     if (Array.isArray(value) || (value && typeof value === "object")) {
@@ -1016,7 +1217,7 @@ function renderObjectEditor(object, path, depth = 0) {
       const head = document.createElement("div");
       head.className = "nested-head";
       const heading = document.createElement("h4");
-      heading.textContent = humanizeKey(key);
+      heading.textContent = isHeroVideoSourcesPath(childPath) ? "Landing Video" : humanizeKey(key);
       head.appendChild(heading);
 
       block.append(head, renderEditorValue(value, childPath, depth + 1));
@@ -1031,28 +1232,34 @@ function renderObjectEditor(object, path, depth = 0) {
 }
 
 function renderEditorValue(value, path, depth = 0) {
+  if (isHeroVideoSourcesPath(path)) return createUnifiedHeroVideoEditor(path);
   if (Array.isArray(value)) return renderArrayEditor(value, path, depth);
   if (value && typeof value === "object") return renderObjectEditor(value, path, depth);
   return renderPrimitiveField(path, value);
 }
 
-function renderGroupedEditor(groups, container) {
-  container.innerHTML = "";
-  groups.forEach((group) => {
-    const value = getValueByPath(state.content, group.path);
-    const section = createSection(group.label, group.description, true);
-    section.appendChild(renderEditorValue(value, group.path));
-    container.appendChild(section);
-  });
-}
-
 function collectMediaEntries(node, path = [], entries = []) {
-  if (typeof node === "string" && isMediaPath(node)) {
+  if (isHiddenContentPath(path)) {
+    return entries;
+  }
+
+  if (isHeroVideoSourcesPath(path)) {
     entries.push({
       path,
-      label: humanizePath(path),
-      value: node,
+      label: "Hero / Landing Video",
+      value: getUnifiedHeroVideoValue(),
     });
+    return entries;
+  }
+
+  if (typeof node === "string" && isMediaPath(node)) {
+    if (joinPath(path) !== "hero.videoSources.mov") {
+      entries.push({
+        path,
+        label: humanizePath(path),
+        value: node,
+      });
+    }
     return entries;
   }
 
@@ -1062,7 +1269,7 @@ function collectMediaEntries(node, path = [], entries = []) {
   }
 
   if (node && typeof node === "object") {
-    Object.entries(node).forEach(([key, value]) => collectMediaEntries(value, [...path, key], entries));
+    Object.entries(node).forEach(([key, entryValue]) => collectMediaEntries(entryValue, [...path, key], entries));
   }
 
   return entries;
@@ -1072,34 +1279,20 @@ function createMediaCard(entry, compact = false) {
   const card = document.createElement("article");
   card.className = "media-card";
 
-  let preview = createMediaPreview(entry.value, compact);
-  card.appendChild(preview);
-
-  const info = document.createElement("div");
-  info.className = "media-meta";
+  const meta = document.createElement("div");
+  meta.className = "media-meta";
 
   const heading = document.createElement("strong");
-  heading.textContent = humanizeKey(entry.path[entry.path.length - 1]);
-  info.appendChild(heading);
+  heading.textContent = isHeroVideoSourcesPath(entry.path)
+    ? "Landing Video"
+    : humanizeKey(entry.path[entry.path.length - 1] || "media");
+  meta.appendChild(heading);
 
   const location = document.createElement("span");
   location.textContent = entry.label;
-  info.appendChild(location);
+  meta.appendChild(location);
 
-  const input = document.createElement("input");
-  input.type = "text";
-  input.value = entry.value;
-  input.addEventListener("input", (event) => {
-    setValueByPath(state.content, entry.path, event.target.value);
-    syncContentDraft();
-    const nextPreview = createMediaPreview(event.target.value, compact);
-    preview.replaceWith(nextPreview);
-    preview = nextPreview;
-  });
-  input.addEventListener("change", () => renderMediaPanels());
-  info.appendChild(input);
-
-  card.appendChild(info);
+  card.append(meta, createMediaControl(entry.path, entry.value, { compact }));
   return card;
 }
 
@@ -1119,8 +1312,12 @@ function renderMediaLibrary(container, compact = false) {
 }
 
 function renderMediaPanels() {
-  renderMediaLibrary(refs.mediaLibrary, true);
-  renderMediaLibrary(refs.assetMediaLibrary, false);
+  if (refs.mediaLibrary) {
+    renderMediaLibrary(refs.mediaLibrary, false);
+  }
+  if (state.activePanel === "assets") {
+    renderAssetsWorkbench();
+  }
 }
 
 function renderPreviewControls() {
@@ -1146,31 +1343,214 @@ function refreshPreview() {
   refs.sitePreviewFrame.src = buildPreviewUrl(state.previewPath, true);
 }
 
+function renderTreeNavigation(groups, selection, container, getChildren, onSelectGroup, onSelectChild) {
+  container.innerHTML = "";
+
+  groups.forEach((group) => {
+    const groupButton = document.createElement("button");
+    groupButton.type = "button";
+    groupButton.className = `tree-item ${selection.groupId === group.id ? "active" : ""}`;
+    groupButton.textContent = group.label;
+    groupButton.addEventListener("click", () => onSelectGroup(group.id));
+    container.appendChild(groupButton);
+
+    if (selection.groupId !== group.id) {
+      return;
+    }
+
+    const children = getChildren(group);
+    if (!children.length) {
+      return;
+    }
+
+    const childList = document.createElement("div");
+    childList.className = "tree-children";
+
+    children.forEach((child) => {
+      const childButton = document.createElement("button");
+      childButton.type = "button";
+      childButton.className = `tree-child ${selection.subKey === child.key ? "active" : ""}`;
+      childButton.textContent = child.label;
+      childButton.addEventListener("click", () => onSelectChild(child.key));
+      childList.appendChild(childButton);
+    });
+
+    container.appendChild(childList);
+  });
+}
+
+function createWorkbenchPane(title, description) {
+  const pane = document.createElement("section");
+  pane.className = "workbench-pane";
+
+  const head = document.createElement("div");
+  head.className = "workbench-pane-head";
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  head.appendChild(heading);
+
+  if (description) {
+    const note = document.createElement("p");
+    note.className = "card-note";
+    note.textContent = description;
+    head.appendChild(note);
+  }
+
+  pane.appendChild(head);
+  return pane;
+}
+
+function getContentChildren(group) {
+  const value = getValueByPath(state.content, group.path);
+  if (!value || Array.isArray(value) || typeof value !== "object") {
+    return [];
+  }
+
+  return getVisibleObjectEntries(value, group.path).map(([key, childValue]) => ({
+    key,
+    label: isHeroVideoSourcesPath([...group.path, key]) ? "Landing Video" : humanizeKey(key),
+    path: [...group.path, key],
+    value: childValue,
+  }));
+}
+
 function renderContentWorkbench() {
   renderPreviewControls();
   renderMediaPanels();
-  renderGroupedEditor(CONTENT_GROUPS, refs.contentSections);
+
+  const currentGroup =
+    CONTENT_GROUPS.find((group) => group.id === state.contentSelection.groupId) || CONTENT_GROUPS[0];
+  const children = getContentChildren(currentGroup);
+  if (children.length && !children.some((child) => child.key === state.contentSelection.subKey)) {
+    state.contentSelection.subKey = children[0].key;
+  }
+
+  renderTreeNavigation(
+    CONTENT_GROUPS,
+    state.contentSelection,
+    refs.contentTree,
+    getContentChildren,
+    (groupId) => {
+      state.contentSelection.groupId = groupId;
+      state.contentSelection.subKey = null;
+      renderContentWorkbench();
+    },
+    (subKey) => {
+      state.contentSelection.subKey = subKey;
+      renderContentWorkbench();
+    }
+  );
+
+  refs.contentDetail.innerHTML = "";
+  const activeGroup =
+    CONTENT_GROUPS.find((group) => group.id === state.contentSelection.groupId) || CONTENT_GROUPS[0];
+  const value = getValueByPath(state.content, activeGroup.path);
+  const activeChild = children.find((child) => child.key === state.contentSelection.subKey);
+
+  const pane = createWorkbenchPane(
+    activeChild ? `${activeGroup.label} / ${activeChild.label}` : activeGroup.label,
+    activeGroup.description
+  );
+  pane.appendChild(renderEditorValue(activeChild ? activeChild.value : value, activeChild ? activeChild.path : activeGroup.path));
+  refs.contentDetail.appendChild(pane);
+
   syncContentDraft();
 }
 
-function renderFormsWorkbench() {
-  renderGroupedEditor(FORM_GROUPS, refs.formsSections);
+function getFormChildren(group) {
+  const value = getValueByPath(state.content, group.path);
+  if (!value || Array.isArray(value) || typeof value !== "object") {
+    return [];
+  }
+
+  return Object.entries(value).map(([key, childValue]) => ({
+    key,
+    label: humanizeKey(key),
+    path: [...group.path, key],
+    value: childValue,
+  }));
 }
 
-function renderFontFamilySelect() {
-  refs.fontFamily.innerHTML = "";
+function renderAssetsWorkbench() {
+  if (!refs.assetsTree || !refs.assetsDetail || !state.content) return;
 
+  const currentGroup = ASSET_GROUPS.find((group) => group.id === state.assetsSelection.groupId) || ASSET_GROUPS[0];
+  const children = currentGroup.type === "form" ? getFormChildren(currentGroup) : [];
+  if (children.length && !children.some((child) => child.key === state.assetsSelection.subKey)) {
+    state.assetsSelection.subKey = children[0].key;
+  }
+
+  renderTreeNavigation(
+    ASSET_GROUPS,
+    state.assetsSelection,
+    refs.assetsTree,
+    (group) => (group.type === "form" ? getFormChildren(group) : []),
+    (groupId) => {
+      state.assetsSelection.groupId = groupId;
+      state.assetsSelection.subKey = null;
+      renderAssetsWorkbench();
+    },
+    (subKey) => {
+      state.assetsSelection.subKey = subKey;
+      renderAssetsWorkbench();
+    }
+  );
+
+  refs.assetsDetail.innerHTML = "";
+  const activeGroup = ASSET_GROUPS.find((group) => group.id === state.assetsSelection.groupId) || ASSET_GROUPS[0];
+
+  if (activeGroup.type === "media") {
+    const pane = createWorkbenchPane(activeGroup.label, activeGroup.description);
+    const library = document.createElement("div");
+    library.className = "media-library media-grid";
+    renderMediaLibrary(library, false);
+    pane.appendChild(library);
+    refs.assetsDetail.appendChild(pane);
+    return;
+  }
+
+  const value = getValueByPath(state.content, activeGroup.path);
+  const activeChild = children.find((child) => child.key === state.assetsSelection.subKey);
+  const pane = createWorkbenchPane(
+    activeChild ? `${activeGroup.label} / ${activeChild.label}` : activeGroup.label,
+    activeGroup.description
+  );
+  pane.appendChild(renderEditorValue(activeChild ? activeChild.value : value, activeChild ? activeChild.path : activeGroup.path));
+  refs.assetsDetail.appendChild(pane);
+}
+
+function createFontFamilyControl() {
+  const field = document.createElement("label");
+  field.className = "field";
+
+  const caption = document.createElement("span");
+  caption.textContent = "Font Family";
+
+  const select = document.createElement("select");
   state.settings.design.fontOptions.forEach((family) => {
     const option = document.createElement("option");
     option.value = family;
     option.textContent = family.split(",")[0].replaceAll("\"", "");
     option.selected = family === state.settings.design.fontFamily;
-    refs.fontFamily.appendChild(option);
+    select.appendChild(option);
   });
+
+  select.addEventListener("change", () => {
+    state.settings.design.fontFamily = select.value;
+    state.settings.branding.fontFamily = select.value;
+    applyDesignToThemeTokens(state.settings);
+    syncSettingsDraft();
+    renderThemeWorkbench();
+  });
+
+  field.append(caption, select);
+  return field;
 }
 
-function renderTypographyControls() {
-  refs.typographyControls.innerHTML = "";
+function createTypographyControls() {
+  const stack = document.createElement("div");
+  stack.className = "slider-stack";
 
   TYPOGRAPHY_FIELDS.forEach(({ key, label }) => {
     const row = document.createElement("div");
@@ -1202,61 +1582,67 @@ function renderTypographyControls() {
       valueBadge.textContent = `${state.settings.design.typography[key].toFixed(2)}x`;
       applyDesignToThemeTokens(state.settings);
       syncSettingsDraft();
-      renderThemePreview();
+      renderThemeWorkbench();
     });
 
-    const decrease = createButton("ghost-btn small icon-btn", "-", () => {
-      range.value = Math.max(0.75, Number(range.value) - 0.05).toFixed(2);
-      range.dispatchEvent(new Event("input"));
+    const decrease = createButton("ghost-btn icon-btn", "-", () => {
+      state.settings.design.typography[key] = Math.max(0.75, Number((state.settings.design.typography[key] - 0.05).toFixed(2)));
+      applyDesignToThemeTokens(state.settings);
+      syncSettingsDraft();
+      renderThemeWorkbench();
     });
 
-    const increase = createButton("ghost-btn small icon-btn", "+", () => {
-      range.value = Math.min(1.35, Number(range.value) + 0.05).toFixed(2);
-      range.dispatchEvent(new Event("input"));
+    const increase = createButton("ghost-btn icon-btn", "+", () => {
+      state.settings.design.typography[key] = Math.min(1.35, Number((state.settings.design.typography[key] + 0.05).toFixed(2)));
+      applyDesignToThemeTokens(state.settings);
+      syncSettingsDraft();
+      renderThemeWorkbench();
     });
 
     controls.append(decrease, range, increase);
     row.append(meta, controls);
-    refs.typographyControls.appendChild(row);
+    stack.appendChild(row);
   });
+
+  return stack;
 }
 
 function createPaletteField(mode, key, label) {
   const palette = state.settings.design.palettes[mode];
-  const row = document.createElement("label");
-  row.className = "color-field";
+  const wrapper = document.createElement("label");
+  wrapper.className = "color-field";
 
-  const labelBlock = document.createElement("div");
-  labelBlock.className = "color-field-copy";
+  const copy = document.createElement("div");
+  copy.className = "color-field-copy";
 
   const heading = document.createElement("strong");
   heading.textContent = label;
-  labelBlock.appendChild(heading);
+  const note = document.createElement("span");
+  note.textContent = palette[key];
+  copy.append(heading, note);
 
-  const hexLabel = document.createElement("span");
-  hexLabel.textContent = safeHex(palette[key], DEFAULT_DESIGN_PALETTES[mode][key]);
-  labelBlock.appendChild(hexLabel);
-
-  const picker = document.createElement("input");
-  picker.type = "color";
-  picker.value = safeHex(palette[key], DEFAULT_DESIGN_PALETTES[mode][key]);
-  picker.addEventListener("input", (event) => {
+  const input = document.createElement("input");
+  input.type = "color";
+  input.value = safeHex(palette[key], DEFAULT_DESIGN_PALETTES[mode][key]);
+  input.addEventListener("input", (event) => {
     palette[key] = event.target.value;
-    hexLabel.textContent = event.target.value;
+    note.textContent = palette[key];
     applyDesignToThemeTokens(state.settings);
     syncSettingsDraft();
-    renderThemePreview();
+    renderThemeWorkbench();
   });
 
-  row.append(labelBlock, picker);
-  return row;
+  wrapper.append(copy, input);
+  return wrapper;
 }
 
-function renderPaletteControls(mode, container) {
-  container.innerHTML = "";
+function createPaletteControls(mode) {
+  const grid = document.createElement("div");
+  grid.className = "color-grid";
   PALETTE_FIELDS.forEach(({ key, label }) => {
-    container.appendChild(createPaletteField(mode, key, label));
+    grid.appendChild(createPaletteField(mode, key, label));
   });
+  return grid;
 }
 
 function createThemePreviewCard(mode) {
@@ -1306,9 +1692,9 @@ function createThemePreviewCard(mode) {
   const hero = document.createElement("div");
   hero.className = "preview-hero";
   hero.innerHTML = `
-    <small>Hero landing</small>
+    <small>Cleaner Energy</small>
     <h4>Turning waste into clean energy</h4>
-    <p>Readable hierarchy, clean spacing, and stronger contrast for non-technical editing.</p>
+    <p>Preview how typography, palette, and spacing feel together before saving changes to the site.</p>
   `;
 
   const actions = document.createElement("div");
@@ -1322,44 +1708,167 @@ function createThemePreviewCard(mode) {
   cards.className = "preview-card-row";
   cards.innerHTML = `
     <div class="preview-mini-card">
-      <strong>Advantage</strong>
-      <span>High-contrast cards and text.</span>
+      <strong>Industrial-ready fuel</strong>
+      <span>Designed for cleaner thermal output and measurable savings.</span>
     </div>
     <div class="preview-mini-card">
-      <strong>Process</strong>
-      <span>Balanced pill, border, and surface styling.</span>
+      <strong>Operational visibility</strong>
+      <span>Check contrast, font sizing, and card clarity without touching CSS.</span>
     </div>
   `;
 
   hero.appendChild(actions);
-  shell.append(topbar, hero, cards);
-  card.append(label, shell);
+  shell.append(label, topbar, hero, cards);
+  card.appendChild(shell);
   return card;
 }
 
-function renderThemePreview() {
-  refs.themePreviewGrid.innerHTML = "";
-  refs.themePreviewGrid.appendChild(createThemePreviewCard("light"));
-  refs.themePreviewGrid.appendChild(createThemePreviewCard("dark"));
+function createThemePreviewGrid() {
+  const grid = document.createElement("div");
+  grid.className = "theme-preview-grid";
+  grid.appendChild(createThemePreviewCard("light"));
+  grid.appendChild(createThemePreviewCard("dark"));
+  return grid;
 }
 
-function renderSettingsMeta() {
-  refs.apiBaseUrl.value = state.settings.api.baseUrl;
-  refs.dashboardRefreshSeconds.value = String(state.settings.analytics.dashboardRefreshSeconds);
-  refs.trafficSourcesEditor.value = state.settings.analytics.trafficSources.join("\n");
+function createSettingsFields() {
+  const shell = document.createElement("div");
+  shell.className = "field-stack";
+
+  const grid = document.createElement("div");
+  grid.className = "two-col-grid compact-grid";
+
+  const apiField = document.createElement("label");
+  apiField.className = "field";
+  apiField.innerHTML = "<span>API Base URL</span>";
+  const apiInput = document.createElement("input");
+  apiInput.type = "text";
+  apiInput.value = state.settings.api.baseUrl;
+  apiInput.addEventListener("input", () => {
+    state.settings.api.baseUrl = apiInput.value.trim() || "http://127.0.0.1:8787";
+    syncSettingsDraft();
+  });
+  apiField.appendChild(apiInput);
+
+  const refreshField = document.createElement("label");
+  refreshField.className = "field";
+  refreshField.innerHTML = "<span>Auto Refresh (seconds)</span>";
+  const refreshInput = document.createElement("input");
+  refreshInput.type = "number";
+  refreshInput.min = "5";
+  refreshInput.step = "5";
+  refreshInput.value = String(state.settings.analytics.dashboardRefreshSeconds);
+  refreshInput.addEventListener("input", () => {
+    state.settings.analytics.dashboardRefreshSeconds = Math.max(5, Number(refreshInput.value || 30));
+    syncSettingsDraft();
+    updateAutoRefreshBadge();
+  });
+  refreshField.appendChild(refreshInput);
+
+  grid.append(apiField, refreshField);
+
+  const sourceField = document.createElement("label");
+  sourceField.className = "field";
+  sourceField.innerHTML = "<span>Traffic Sources</span>";
+  const sourcesInput = document.createElement("textarea");
+  sourcesInput.rows = 5;
+  sourcesInput.value = state.settings.analytics.trafficSources.join("\n");
+  sourcesInput.addEventListener("input", () => {
+    state.settings.analytics.trafficSources = sourcesInput.value
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    syncSettingsDraft();
+  });
+  const hint = document.createElement("small");
+  hint.textContent = "One source per line.";
+  sourceField.append(sourcesInput, hint);
+
+  shell.append(grid, sourceField);
+  return shell;
+}
+
+function createImportExportControls() {
+  const stack = document.createElement("div");
+  stack.className = "field-stack";
+
+  const note = document.createElement("p");
+  note.className = "card-note";
+  note.textContent = "Export the full theme settings JSON or import a saved file to restore fonts, colors, and dashboard refresh options.";
+
+  const actions = document.createElement("div");
+  actions.className = "inline-actions";
+
+  const exportButton = createButton("ghost-btn", "Export Theme Settings", () => {
+    downloadJson("site-settings.json", state.settings);
+  });
+
+  const importInput = document.createElement("input");
+  importInput.type = "file";
+  importInput.accept = ".json,application/json";
+  importInput.className = "hidden";
+  importInput.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const raw = await file.text();
+      state.settings = ensureDesignSettings(JSON.parse(raw));
+      syncSettingsDraft();
+      renderThemeWorkbench();
+      flashStatus("Theme settings imported");
+    } catch (error) {
+      window.alert(`Import failed: ${error.message}`);
+    } finally {
+      importInput.value = "";
+    }
+  });
+
+  const importButton = createButton("primary-btn", "Import Theme Settings", () => importInput.click());
+  actions.append(exportButton, importButton, importInput);
+  stack.append(note, actions);
+  return stack;
 }
 
 function renderThemeWorkbench() {
   ensureDesignSettings(state.settings);
-  renderFontFamilySelect();
-  renderTypographyControls();
-  renderPaletteControls("light", refs.lightPaletteEditor);
-  renderPaletteControls("dark", refs.darkPaletteEditor);
-  renderThemePreview();
-  renderSettingsMeta();
+  refs.themeTree.innerHTML = "";
+  refs.themeDetail.innerHTML = "";
+
+  THEME_SECTIONS.forEach((section) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `tree-item ${state.themeSelection === section.id ? "active" : ""}`;
+    button.textContent = section.label;
+    button.addEventListener("click", () => {
+      state.themeSelection = section.id;
+      renderThemeWorkbench();
+    });
+    refs.themeTree.appendChild(button);
+  });
+
+  const activeSection = THEME_SECTIONS.find((section) => section.id === state.themeSelection) || THEME_SECTIONS[0];
+  const pane = createWorkbenchPane(activeSection.label, activeSection.description);
+
+  if (activeSection.id === "typography") {
+    const stack = document.createElement("div");
+    stack.className = "field-stack";
+    stack.append(createFontFamilyControl(), createTypographyControls());
+    pane.appendChild(stack);
+  } else if (activeSection.id === "lightPalette") {
+    pane.appendChild(createPaletteControls("light"));
+  } else if (activeSection.id === "darkPalette") {
+    pane.appendChild(createPaletteControls("dark"));
+  } else if (activeSection.id === "preview") {
+    pane.appendChild(createThemePreviewGrid());
+  } else if (activeSection.id === "settings") {
+    pane.appendChild(createSettingsFields());
+  } else if (activeSection.id === "importExport") {
+    pane.appendChild(createImportExportControls());
+  }
+
+  refs.themeDetail.appendChild(pane);
   syncSettingsDraft();
 }
-
 function renderSidebar() {
   refs.sidebarNav.innerHTML = "";
 
@@ -1390,6 +1899,10 @@ function setPanel(panelId) {
 
   const activeLabel = state.schema?.tabs.find((tab) => tab.id === validPanel)?.label || validPanel;
   refs.panelTitle.textContent = activeLabel;
+
+  if (validPanel === "content") renderContentWorkbench();
+  if (validPanel === "theme") renderThemeWorkbench();
+  if (validPanel === "assets") renderAssetsWorkbench();
 }
 
 function renderOverview() {
@@ -1440,7 +1953,7 @@ function renderOverview() {
     return;
   }
 
-  events.slice(0, 10).forEach((event) => {
+  events.slice(0, 6).forEach((event) => {
     refs.activityList.appendChild(createHistoryItem(event));
   });
 }
@@ -1505,6 +2018,30 @@ function createHistoryItem(entry) {
   return item;
 }
 
+function openActivityModal(title, entries) {
+  if (!refs.activityModal) return;
+  refs.activityModalTitle.textContent = title;
+  refs.activityModalList.innerHTML = "";
+
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "No activity recorded yet.";
+    refs.activityModalList.appendChild(empty);
+  } else {
+    entries.forEach((entry) => {
+      refs.activityModalList.appendChild(createHistoryItem(entry));
+    });
+  }
+
+  refs.activityModal.classList.remove("hidden");
+}
+
+function closeActivityModal() {
+  if (!refs.activityModal) return;
+  refs.activityModal.classList.add("hidden");
+}
+
 function renderAnalytics() {
   const submissions = state.analytics.submissions;
   const max = Math.max(submissions.contactCount, submissions.projectCount, submissions.newsletterCount, 1);
@@ -1564,7 +2101,7 @@ function renderAnalytics() {
       empty.textContent = "No staff activity yet.";
       refs.changeHistoryList.appendChild(empty);
     } else {
-      state.analytics.changeHistory.slice(0, 18).forEach((entry) => {
+      state.analytics.changeHistory.slice(0, 6).forEach((entry) => {
         refs.changeHistoryList.appendChild(createHistoryItem(entry));
       });
     }
@@ -1593,7 +2130,7 @@ function renderTeamPanel() {
     return;
   }
 
-  (state.teamOverview.changeHistory || []).slice(0, 12).forEach((entry) => {
+  (state.teamOverview.changeHistory || []).slice(0, 6).forEach((entry) => {
     refs.teamHistoryList.appendChild(createHistoryItem(entry));
   });
 
@@ -1694,6 +2231,23 @@ function renderTeamPanel() {
     });
 
     actions.appendChild(saveButton);
+
+    if (user.role === "staff") {
+      const removeButton = createButton("danger-btn", "Remove Staff", async () => {
+        if (!window.confirm(`Remove staff account for ${user.displayName}?`)) return;
+        try {
+          await api(`/api/team/users/${user.id}`, {
+            method: "DELETE",
+          });
+          await loadDashboard();
+          flashStatus("Staff account removed");
+        } catch (error) {
+          window.alert(`Staff removal failed: ${error.message}`);
+        }
+      });
+      actions.appendChild(removeButton);
+    }
+
     fields.append(displayNameField, usernameField, passwordField, activeField, usage, actions);
     card.append(head, fields);
     refs.userGrid.appendChild(card);
@@ -1751,23 +2305,19 @@ function renderSubmissions() {
 }
 
 function applyBasicSettingsFields() {
-  state.settings.api.baseUrl = refs.apiBaseUrl.value.trim() || "http://127.0.0.1:8787";
-  state.settings.analytics.dashboardRefreshSeconds = Math.max(
-    5,
-    Number(refs.dashboardRefreshSeconds.value || 30)
-  );
-  state.settings.analytics.trafficSources = refs.trafficSourcesEditor.value
-    .split("\n")
-    .map((line) => line.trim())
+  state.settings.api.baseUrl = state.settings.api.baseUrl?.trim() || "http://127.0.0.1:8787";
+  state.settings.analytics.dashboardRefreshSeconds = Math.max(5, Number(state.settings.analytics.dashboardRefreshSeconds || 30));
+  state.settings.analytics.trafficSources = (state.settings.analytics.trafficSources || [])
+    .map((line) => String(line).trim())
     .filter(Boolean);
-  state.settings.design.fontFamily = refs.fontFamily.value || state.settings.design.fontOptions[0];
+  state.settings.design.fontFamily = state.settings.design.fontFamily || state.settings.design.fontOptions[0];
   state.settings.branding.fontFamily = state.settings.design.fontFamily;
   applyDesignToThemeTokens(state.settings);
   syncSettingsDraft();
 }
 
 function parseContentEditor() {
-  state.content = JSON.parse(refs.contentEditor.value);
+  state.content = ensureContentEditingShape(JSON.parse(refs.contentEditor.value));
   syncContentDraft();
 }
 
@@ -1809,6 +2359,13 @@ function startAutoRefresh() {
   state.autoRefreshId = window.setInterval(() => {
     refreshTelemetry().catch(console.error);
   }, seconds * 1000);
+  updateAutoRefreshBadge();
+}
+
+function updateAutoRefreshBadge() {
+  if (!refs.autoRefreshBadge) return;
+  const seconds = Math.max(5, Number(state.settings?.analytics?.dashboardRefreshSeconds || 30));
+  refs.autoRefreshBadge.textContent = `Auto refresh ${seconds}s`;
 }
 
 async function trackDashboardViewOnce() {
@@ -1849,7 +2406,7 @@ async function refreshAll() {
   state.auth.user = schema.currentUser;
   state.defaults.content = defaultContent;
   state.defaults.settings = defaultSettings;
-  state.content = loadDraft("content", content);
+  state.content = ensureContentEditingShape(loadDraft("content", content));
   state.settings = ensureDesignSettings(loadDraft("settings", settings));
   state.analytics = analytics;
   state.submissions = submissions;
@@ -1859,7 +2416,7 @@ async function refreshAll() {
   renderOverview();
   renderContentWorkbench();
   renderThemeWorkbench();
-  renderFormsWorkbench();
+  renderAssetsWorkbench();
   renderAnalytics();
   renderTeamPanel();
   renderSubmissions();
@@ -1898,7 +2455,7 @@ async function saveSettings(meta = {}) {
 }
 
 async function resetContentToDefaults() {
-  state.content = cloneJson(state.defaults.content);
+  state.content = ensureContentEditingShape(cloneJson(state.defaults.content));
   syncContentDraft();
   await saveContent({ reason: "reset-defaults" });
 }
@@ -1978,6 +2535,26 @@ function bindEvents() {
   refs.loginForm.addEventListener("submit", handleLoginSubmit);
   refs.logoutBtn.addEventListener("click", handleLogout);
   refs.createStaffForm.addEventListener("submit", handleCreateStaff);
+  refs.viewAllActivityBtn.addEventListener("click", () => {
+    openActivityModal("All Activity", state.analytics?.activity || []);
+  });
+  refs.viewAllChangesBtn?.addEventListener("click", () => {
+    openActivityModal("All Change History", state.analytics?.changeHistory || []);
+  });
+  refs.viewAllTeamHistoryBtn?.addEventListener("click", () => {
+    openActivityModal("All Team History", state.teamOverview?.changeHistory || []);
+  });
+  refs.closeActivityModalBtn.addEventListener("click", closeActivityModal);
+  refs.activityModal.addEventListener("click", (event) => {
+    if (event.target === refs.activityModal) {
+      closeActivityModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeActivityModal();
+    }
+  });
 
   document.getElementById("refreshAllBtn").addEventListener("click", loadDashboard);
   document.getElementById("refreshAnalyticsBtn").addEventListener("click", async () => {
@@ -2015,7 +2592,7 @@ function bindEvents() {
     try {
       parseContentEditor();
       renderContentWorkbench();
-      renderFormsWorkbench();
+      renderAssetsWorkbench();
       flashStatus("Content JSON applied");
     } catch (error) {
       window.alert(`Content JSON is invalid: ${error.message}`);
@@ -2037,20 +2614,6 @@ function bindEvents() {
     } catch (error) {
       window.alert(`Content reset failed: ${error.message}`);
     }
-  });
-
-  refs.fontFamily.addEventListener("change", () => {
-    state.settings.design.fontFamily = refs.fontFamily.value;
-    state.settings.branding.fontFamily = refs.fontFamily.value;
-    applyDesignToThemeTokens(state.settings);
-    syncSettingsDraft();
-    renderThemePreview();
-  });
-
-  document.getElementById("applySettingsFieldsBtn").addEventListener("click", () => {
-    applyBasicSettingsFields();
-    renderThemePreview();
-    flashStatus("Theme settings applied");
   });
 
   document.getElementById("applySettingsJsonBtn").addEventListener("click", () => {
@@ -2078,14 +2641,6 @@ function bindEvents() {
     } catch (error) {
       window.alert(`Theme reset failed: ${error.message}`);
     }
-  });
-
-  document.getElementById("downloadContentBtn").addEventListener("click", () => {
-    downloadJson("site-content.json", state.content);
-  });
-
-  document.getElementById("downloadSettingsBtn").addEventListener("click", () => {
-    downloadJson("site-settings.json", state.settings);
   });
 }
 

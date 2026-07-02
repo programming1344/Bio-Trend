@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { buildHeroUiWindows, fillTemplate, getPageMeta, siteContent, siteSettings } from "./lib/siteData";
 
 const navItems = siteContent.site.navigation;
-const heroVideoWindows = buildHeroUiWindows(siteContent.hero.uiWindows);
+const heroVideoWindows = buildHeroUiWindows(siteContent.hero.uiWindows || []);
+const heroVideoSource =
+  siteContent.hero.videoSource || siteContent.hero.videoSources?.mp4 || siteContent.hero.videoSources?.mov || "";
 const heroUiFadeSeconds = 0.9;
 const apiBaseUrl = siteSettings.api.baseUrl.replace(/\/+$/, "");
 
@@ -395,8 +397,7 @@ function Hero({ onNavigate }) {
         onSeeked={syncHeroVisibility}
         onTimeUpdate={syncHeroVisibility}
       >
-        <source src={siteContent.hero.videoSources.mp4} type="video/mp4" />
-        <source src={siteContent.hero.videoSources.mov} type="video/quicktime" />
+        <source src={heroVideoSource} />
       </video>
       <div className="hero-shade" />
       <div className="hero-content">
@@ -740,17 +741,12 @@ function ContactPage() {
                 </div>
                 <div className="form-group">
                   <label htmlFor="form-interest">{formContent.fields.interest.label}</label>
-                  <select
+                  <CustomSelect
                     id="form-interest"
                     value={formState.interest}
-                    onChange={(event) => setFormState({ ...formState, interest: event.target.value })}
-                  >
-                    {formContent.fields.interest.options.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormState({ ...formState, interest: val })}
+                    options={formContent.fields.interest.options}
+                  />
                 </div>
                 <div className="form-group">
                   <label htmlFor="form-message">{formContent.fields.message.label}</label>
@@ -954,6 +950,58 @@ function Footer({ onNavigate, onOpenProjectModal }) {
   );
 }
 
+function CustomSelect({ id, value, onChange, options }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleOptionClick = (opt) => {
+    onChange(opt);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="custom-select-container" ref={containerRef} id={id}>
+      <button
+        type="button"
+        className="custom-select-trigger"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+      >
+        <span>{value}</span>
+        <svg className={`chevron-icon ${isOpen ? "open" : ""}`} viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+      {isOpen && (
+        <ul className="custom-select-options" role="listbox">
+          {options.map((opt) => (
+            <li
+              key={opt}
+              className={`custom-select-option ${opt === value ? "selected" : ""}`}
+              role="option"
+              aria-selected={opt === value}
+              onClick={() => handleOptionClick(opt)}
+            >
+              {opt}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function ProjectModal({ onClose }) {
   const [formState, setFormState] = useState(createProjectFormState);
   const [submitted, setSubmitted] = useState(false);
@@ -1029,17 +1077,12 @@ function ProjectModal({ onClose }) {
             </div>
             <div className="form-group">
               <label htmlFor="modal-interest">{modalContent.fields.interest.label}</label>
-              <select
+              <CustomSelect
                 id="modal-interest"
                 value={formState.interest}
-                onChange={(event) => setFormState({ ...formState, interest: event.target.value })}
-              >
-                {modalContent.fields.interest.options.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormState({ ...formState, interest: val })}
+                options={modalContent.fields.interest.options}
+              />
             </div>
             <div className="form-group">
               <label htmlFor="modal-message">{modalContent.fields.message.label}</label>
