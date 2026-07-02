@@ -1,10 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { buildHeroUiWindows, fillTemplate, getPageMeta, siteContent, siteSettings } from "./lib/siteData";
 
+const resolveAssetPath = (path) => {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+    return path;
+  }
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  return `${import.meta.env.BASE_URL || "/"}${cleanPath}`;
+};
+
 const navItems = siteContent.site.navigation;
 const heroVideoWindows = buildHeroUiWindows(siteContent.hero.uiWindows || []);
-const heroVideoSource =
-  siteContent.hero.videoSource || siteContent.hero.videoSources?.mp4 || siteContent.hero.videoSources?.mov || "";
+const heroVideoSource = resolveAssetPath(
+  siteContent.hero.videoSource || siteContent.hero.videoSources?.mp4 || siteContent.hero.videoSources?.mov || ""
+);
 const heroUiFadeSeconds = 0.9;
 const apiBaseUrl = siteSettings.api.baseUrl.replace(/\/+$/, "");
 
@@ -174,7 +184,7 @@ function Header({ currentPath, currentTone, onNavigate, theme, setTheme, onOpenP
         }}
         aria-label={`${siteContent.site.name} home`}
       >
-        <img src={siteContent.site.logo.src} alt={siteContent.site.logo.alt} />
+        <img src={resolveAssetPath(siteContent.site.logo.src)} alt={siteContent.site.logo.alt} />
       </AppLink>
 
       <nav className={`site-nav ${mobileMenuOpen ? "mobile-open" : ""}`} aria-label="Primary navigation">
@@ -392,7 +402,7 @@ function Hero({ onNavigate }) {
         playsInline
         preload="auto"
         aria-hidden="true"
-        poster="/Bio-Trend/assets/nature.jpg"
+        poster={resolveAssetPath("/assets/nature.jpg")}
         onLoadedMetadata={syncHeroVisibility}
         onPlay={syncHeroVisibility}
         onSeeked={syncHeroVisibility}
@@ -502,7 +512,7 @@ function ProcessPage() {
       </section>
       <section className="section section-process">
         <div className="process-media">
-          <img src={overview.image.src} alt={overview.image.alt} />
+          <img src={resolveAssetPath(overview.image.src)} alt={overview.image.alt} />
         </div>
         <div className="process-copy">
           <p className="eyebrow">{overview.eyebrow}</p>
@@ -621,7 +631,7 @@ function ProjectsPage() {
           {items.map((project) => (
             <article className="project-card" key={project.title}>
               <div className="proj-img-wrap">
-                <img src={project.img} alt={project.title} />
+                <img src={resolveAssetPath(project.img)} alt={project.title} />
               </div>
               <div className="proj-content">
                 <p className="eyebrow">{`${project.location} - ${project.status}`}</p>
@@ -853,7 +863,7 @@ function Footer({ onNavigate, onOpenProjectModal }) {
       <div className="footer-shell">
         <div className="footer-col brand-col">
           <div className="footer-brand">
-            <img src={siteContent.site.logo.src} alt={`${siteContent.site.logo.alt} Logo`} />
+            <img src={resolveAssetPath(siteContent.site.logo.src)} alt={`${siteContent.site.logo.alt} Logo`} />
             <span>{siteContent.site.name}</span>
           </div>
           <p className="brand-desc">{siteContent.footer.brandDescription}</p>
