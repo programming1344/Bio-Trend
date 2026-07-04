@@ -45,7 +45,35 @@ const MIME_TYPES = {
   ".svg": "image/svg+xml",
 };
 
-const sessions = new Map();
+const SESSION_SECRET = process.env.SESSION_SECRET || "bio-trend-demo-secret-change-me";
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+function signSessionToken(userId) {
+  const payload = JSON.stringify({ userId, exp: Date.now() + SESSION_TTL_MS });
+  const payloadB64 = Buffer.from(payload).toString("base64url");
+  const signature = crypto.createHmac("sha256", SESSION_SECRET).update(payloadB64).digest("base64url");
+  return `${payloadB64}.${signature}`;
+}
+
+function verifySessionToken(token) {
+  if (!token || typeof token !== "string" || !token.includes(".")) return null;
+  const [payloadB64, signature] = token.split(".");
+  const expectedSignature = crypto.createHmac("sha256", SESSION_SECRET).update(payloadB64).digest("base64url");
+
+  const sigBuffer = Buffer.from(signature || "");
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+    if (!payload.userId || !payload.exp || Date.now() > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 function buildDashboardSchema(role) {
   const tabs = [
@@ -282,19 +310,15 @@ function getBearerToken(request) {
 
 async function getSessionContext(request) {
   const token = getBearerToken(request);
-  if (!token || !sessions.has(token)) return null;
+  const payload = verifySessionToken(token);
+  if (!payload) return null;
 
-  const session = sessions.get(token);
   const users = await readJson(FILES.users);
-  const user = users.find((item) => item.id === session.userId && item.active);
+  const user = users.find((item) => item.id === payload.userId && item.active);
 
-  if (!user) {
-    sessions.delete(token);
-    return null;
-  }
+  if (!user) return null;
 
-  session.lastSeenAt = nowIso();
-  return { token, session, user, users };
+  return { token, session: payload, user, users };
 }
 
 async function requireAuth(request, response) {
@@ -542,12 +566,7 @@ async function handleApi(request, response, url) {
     user.lastLoginAt = nowIso();
     await writeJson(FILES.users, users);
 
-    const token = crypto.randomBytes(32).toString("hex");
-    sessions.set(token, {
-      userId: user.id,
-      createdAt: nowIso(),
-      lastSeenAt: nowIso(),
-    });
+    const token = signSessionToken(user.id);
 
     await recordActivity("auth-login", `${user.displayName} signed in`, {}, user);
     sendJson(response, 200, { ok: true, token, user: sanitizeUser(user) });
@@ -566,7 +585,6 @@ async function handleApi(request, response, url) {
     const context = await requireAuth(request, response);
     if (!context) return;
 
-    sessions.delete(context.token);
     await recordActivity("auth-logout", `${context.user.displayName} signed out`, {}, context.user);
     sendJson(response, 200, { ok: true });
     return;
@@ -844,12 +862,6 @@ async function handleApi(request, response, url) {
 
     const nextUsers = users.filter((user) => user.id !== target.id);
     await writeJson(FILES.users, nextUsers);
-
-    for (const [token, session] of sessions.entries()) {
-      if (session.userId === target.id) {
-        sessions.delete(token);
-      }
-    }
 
     await recordActivity(
       "team-user-remove",
