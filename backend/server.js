@@ -236,13 +236,20 @@ async function ensureStorage() {
   await ensureFile(FILES.project, []);
   await ensureFile(FILES.newsletter, []);
   await ensureFile(FILES.audit, []);
+  const adminPasswordRecord = createPasswordRecord(DEFAULT_ADMIN.password);
   await ensureFile(FILES.users, [
-    createUserRecord({
-      username: DEFAULT_ADMIN.username,
+    {
+      id: "usr_default_admin",
+      username: normalizeUsername(DEFAULT_ADMIN.username),
       displayName: DEFAULT_ADMIN.displayName,
-      password: DEFAULT_ADMIN.password,
       role: "admin",
-    }),
+      passwordSalt: adminPasswordRecord.salt,
+      passwordHash: adminPasswordRecord.hash,
+      active: true,
+      createdAt: nowIso(),
+      createdBy: "system",
+      lastLoginAt: null,
+    },
   ]);
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
 }
