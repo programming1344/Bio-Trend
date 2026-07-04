@@ -2,15 +2,20 @@
 
 const http = require("http");
 const fs = require("fs/promises");
+const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 
+const IS_SERVERLESS = !!process.env.VERCEL;
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DASHBOARD_DIR = path.join(ROOT_DIR, "dashboard");
-const SHARED_DATA_DIR = path.join(ROOT_DIR, "data");
-const LOCAL_DATA_DIR = path.join(__dirname, "data");
+const SOURCE_DATA_DIR = path.join(ROOT_DIR, "data");
+
+const WRITABLE_ROOT = IS_SERVERLESS ? path.join(os.tmpdir(), "biotrend-data") : ROOT_DIR;
+const SHARED_DATA_DIR = IS_SERVERLESS ? path.join(WRITABLE_ROOT, "data") : SOURCE_DATA_DIR;
+const LOCAL_DATA_DIR = IS_SERVERLESS ? path.join(WRITABLE_ROOT, "backend-data") : path.join(__dirname, "data");
 const PUBLIC_DIR = path.join(ROOT_DIR, "public");
-const UPLOADS_DIR = path.join(PUBLIC_DIR, "uploads");
+const UPLOADS_DIR = IS_SERVERLESS ? path.join(WRITABLE_ROOT, "uploads") : path.join(PUBLIC_DIR, "uploads");
 const PORT = Number(process.env.PORT || 8787);
 
 const DEFAULT_ADMIN = {
@@ -180,7 +185,24 @@ async function ensureFile(filePath, fallback) {
   }
 }
 
+async function copyIfMissing(sourcePath, destPath) {
+  try {
+    await fs.access(destPath);
+  } catch {
+    await fs.mkdir(path.dirname(destPath), { recursive: true });
+    const content = await fs.readFile(sourcePath, "utf8");
+    await fs.writeFile(destPath, content);
+  }
+}
+
 async function ensureStorage() {
+  if (IS_SERVERLESS) {
+    await copyIfMissing(path.join(SOURCE_DATA_DIR, "site-content.json"), FILES.content);
+    await copyIfMissing(path.join(SOURCE_DATA_DIR, "default-site-content.json"), FILES.defaultContent);
+    await copyIfMissing(path.join(SOURCE_DATA_DIR, "site-settings.json"), FILES.settings);
+    await copyIfMissing(path.join(SOURCE_DATA_DIR, "default-site-settings.json"), FILES.defaultSettings);
+  }
+
   await ensureFile(FILES.analytics, baseAnalytics());
   await ensureFile(FILES.contact, []);
   await ensureFile(FILES.project, []);
